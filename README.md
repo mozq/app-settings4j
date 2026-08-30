@@ -31,13 +31,13 @@ AppSettings settings = AppSettings
         .of("acme", "notes", "settings.properties")
         .load();
 
-String theme = settings.get("theme", "light");
+String theme = settings.getString("theme", "light");
 int width = settings.getInt("window.width", 1024);
 
 settings
-        .setValue("theme", theme)
-        .setValue("window.width", width)
-        .setValue("recent.tags", List.of("work", "archive"))
+        .set("theme", theme)
+        .set("window.width", width)
+        .set("recent.tags", List.of("work", "archive"))
         .store();
 ```
 
@@ -97,52 +97,86 @@ Saving writes through a temporary file and replace operation when possible. If a
 
 ## Values
 
-Use `setValue(String key, Object value)` to store values.
+Use `set(String key, Object value)` to store values.
 
 | Java input | Stored as |
 | --- | --- |
 | `String` | string |
-| finite `Number` | number |
+| finite `Number`, `BigInteger`, `BigDecimal` | number |
 | `Double.NaN`, infinities, and the `Float` equivalents | string |
 | `Boolean` | boolean |
 | `Instant`, `Date` | UTC instant with `Z` |
 | `LocalDateTime`, `LocalDate`, `LocalTime` | date/time without a time zone |
 | `OffsetDateTime`, `ZonedDateTime` | date/time with offset or zone |
 | `Collection` | list |
-| `Enum`, `Locale`, `TimeZone` | string |
+| `Enum`, `Locale`, `TimeZone`, `ZoneId`, `Path`, `URI` | string |
 | `null` | null |
 
 Read values as strings:
 
 ```java
-String theme = settings.get("theme", "light");
+String theme = settings.getString("theme", "light");
 Map<String, String> strings = settings.asStringMap();
 ```
 
-Read values as typed Java objects:
+Read inferred Java values without conversion:
 
 ```java
-Object value = settings.getValue("window.width");
-Map<String, Object> values = settings.asValueMap();
+Object value = settings.get("window.width");
+Map<String, Object> values = settings.asMap();
 ```
 
-Read values as a specific type:
+`get(key)` returns `Object` because no target type is specified. It exposes the inferred Java value as-is:
+
+| Stored value | Returned type |
+| --- | --- |
+| string | `String` |
+| number | `BigDecimal` |
+| boolean | `Boolean` |
+| date/time | `Instant`, `OffsetDateTime`, `ZonedDateTime`, `LocalDateTime`, `LocalDate`, or `LocalTime` |
+| list | `List<Object>` |
+| null | `null` |
+
+`asMap()` returns values using the same type rules as `get(key)`.
+
+For common types, use the typed helpers:
 
 ```java
 int width = settings.getInt("window.width", 1024);
 boolean enabled = settings.getBoolean("autosave.enabled", false);
+Path outputDirectory = settings.getPath("output.directory", Path.of("."));
 List<String> tags = settings.getList("recent.tags", String.class, List.of());
 ```
 
-Generic typed access is also available:
+Available typed helpers include `getByte`, `getShort`, `getInt`, `getLong`, `getFloat`, `getDouble`, `getBigInteger`, `getBigDecimal`, `getBoolean`, `getChar`, `getEnum`, `getLocale`, `getTimeZone`, `getZoneId`, `getPath`, `getUri`, and the date/time getters.
+
+Generic typed access is also available. These overloads return `T` because the target type is provided explicitly, or inferred from the default value:
 
 ```java
-Integer width = settings.getValue("window.width", Integer.class, 1024);
+Integer width = settings.get("window.width", 1024);
+Integer explicitWidth = settings.get("window.width", Integer.class, 1024);
 Locale locale = settings.getLocale("locale", Locale.US);
 TimeZone timeZone = settings.getTimeZone("timeZone", TimeZone.getTimeZone("UTC"));
+URI endpoint = settings.getUri("endpoint", URI.create("https://example.com"));
 ```
 
+Use the `Class<T>` overload when the default value is `null` or when you want the target type to be explicit.
+
 If a value is missing or cannot be converted, the provided default value is returned.
+
+Typed helpers and generic typed access use the same conversion rules. When string values are converted, the same type inference used while loading key-value, INI, YAML, and JSON files is applied first.
+
+Compatible numeric types are converted through `BigDecimal`: integer targets reject fractional values and out-of-range values, and floating-point targets reject `NaN` and infinity.
+
+Date/time getters and generic typed access also share one conversion rule. `Instant`, `Date`, `OffsetDateTime`, and `ZonedDateTime` can be converted as timeline values. `LocalDateTime`, `LocalDate`, and `LocalTime` can be converted from timeline values using the configured time zone. `LocalDateTime` and `LocalDate` can also be converted to timeline values using the configured time zone; `LocalTime` cannot because it has no date.
+
+```java
+AppSettings settings = AppSettings
+        .of("acme", "notes", "settings.properties")
+        .timeZone(TimeZone.getTimeZone("UTC"));
+```
+
+Boolean values use the same strict inference as loaded files: `true` and `false` are booleans. Other text falls back to the provided default when read as `Boolean`.
 
 ## Null Values
 
@@ -151,10 +185,10 @@ Null values are kept internally. By default, `nullable(false)` is used, so null 
 ```java
 AppSettings settings = AppSettings
         .of("acme", "notes", "settings.properties")
-        .setValue("last.opened", null);
+        .set("last.opened", null);
 
 settings.contains("last.opened");              // false
-settings.getValue("last.opened", "fallback");  // "fallback"
+settings.getString("last.opened", "fallback"); // "fallback"
 ```
 
 When `nullable(true)` is enabled, null values are visible and are written to the file:
@@ -163,10 +197,10 @@ When `nullable(true)` is enabled, null values are visible and are written to the
 AppSettings settings = AppSettings
         .of("acme", "notes", "settings.json")
         .nullable(true)
-        .setValue("last.opened", null);
+        .set("last.opened", null);
 
 settings.contains("last.opened");              // true
-settings.getValue("last.opened", "fallback");  // null
+settings.getString("last.opened", "fallback"); // null
 ```
 
 Use `remove(key)` to delete a key.
@@ -229,9 +263,10 @@ INI files use the same value syntax as key-value files. Dotted keys become secti
 
 ```java
 settings
-        .setValue("theme", "dark")
-        .setValue("editor", "enabled")
-        .setValue("editor.font.size", "14");
+        .set("theme", "dark")
+        .set("editor", "enabled")
+        .set("editor.wrap", true)
+        .set("editor.font.size", 14);
 ```
 
 ```ini
@@ -239,9 +274,10 @@ theme=dark
 
 [editor]
 @=enabled
+wrap=true
 
 [editor.font]
-size="14"
+size=14
 ```
 
 The `@` key is reserved for the value of the current section when a key has both a value and child keys.
@@ -269,8 +305,9 @@ When a key has both a value and child keys, `@` is used in the same way as INI:
 ```yaml
 editor:
   '@': 'enabled'
+  wrap: true
   font:
-    size: '14'
+    size: 14
 ```
 
 This format is designed for app settings, not as a complete YAML parser. Flow maps, anchors, tags, and multiline string blocks are not supported. Comments and formatting from an existing file are not preserved when saving.
@@ -300,6 +337,7 @@ Dotted keys are written as nested JSON objects. If a key has both a value and ch
 {
   "editor": {
     "@": "enabled",
+    "wrap": true,
     "font": {
       "size": 14
     }

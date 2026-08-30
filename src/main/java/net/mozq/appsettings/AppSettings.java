@@ -8,12 +8,13 @@ package net.mozq.appsettings;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.math.BigInteger;
+import java.net.URI;
 import java.nio.charset.StandardCharsets;
 import java.nio.file.AtomicMoveNotSupportedException;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.nio.file.StandardCopyOption;
-import java.time.DateTimeException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.LocalDateTime;
@@ -24,7 +25,6 @@ import java.time.ZonedDateTime;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
-import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Locale;
@@ -37,14 +37,13 @@ import java.util.TimeZone;
  * directory for the current operating system.
  */
 public final class AppSettings {
-	private static final Map<Class<?>, Class<?>> PRIMITIVE_WRAPPERS = primitiveWrappers();
-
 	private final String vendor;
 	private final String app;
 	private final String fileName;
 	private final AppEnvironment environment;
 	private final LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 	private SettingsFormat format;
+	private TimeZone timeZone = TimeZone.getDefault();
 	private boolean nullable;
 
 	/**
@@ -144,36 +143,73 @@ public final class AppSettings {
 	 * Returns the raw string value for a key, or the default when the key is
 	 * missing, null-hidden, or has no string representation.
 	 */
-	public String get(String key, String defaultValue) {
-		String value = SettingsValues.raw(visibleValue(key), nullable);
+	public String getString(String key, String defaultValue) {
+		if (!contains(key)) {
+			return defaultValue;
+		}
+		SettingsValue settingsValue = values.get(key);
+		if (settingsValue instanceof SettingsValue.NullValue) {
+			return null;
+		}
+		String value = SettingsValues.raw(settingsValue, nullable);
 		return value == null ? defaultValue : value;
+	}
+
+	/**
+	 * Returns the raw string value for a key, or {@code null} when unavailable.
+	 */
+	public String getString(String key) {
+		return getString(key, null);
 	}
 
 	/**
 	 * Returns the typed Java value for a key, or {@code null} when unavailable.
 	 */
-	public Object getValue(String key) {
-		return getValue(key, null);
-	}
-
-	/**
-	 * Returns the typed Java value for a key, or the default when unavailable.
-	 */
-	public Object getValue(String key, Object defaultValue) {
+	public Object get(String key) {
 		if (!contains(key)) {
-			return defaultValue;
+			return null;
 		}
 		return SettingsValues.object(values.get(key), nullable);
 	}
 
 	/**
-	 * Converts the value for a key to the requested type when possible.
+	 * Converts the value for a key to the default value type when possible.
 	 */
-	public <T> T getValue(String key, Class<T> type, T defaultValue) {
+	public <T> T get(String key, T defaultValue) {
 		if (!contains(key)) {
 			return defaultValue;
 		}
-		Object value = getValue(key);
+		Object value = get(key);
+		if (value == null) {
+			return null;
+		}
+		if (defaultValue == null) {
+			return null;
+		}
+		@SuppressWarnings("unchecked")
+		Class<T> type = (Class<T>) defaultValue.getClass();
+		T converted = convertValue(value, type);
+		return converted == null ? defaultValue : converted;
+	}
+
+	/**
+	 * Converts the value for a key to the requested type, or {@code null} when
+	 * unavailable.
+	 */
+	public <T> T get(String key, Class<T> type) {
+		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
+		return get(key, type, null);
+	}
+
+	/**
+	 * Converts the value for a key to the requested type when possible.
+	 */
+	public <T> T get(String key, Class<T> type, T defaultValue) {
+		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
+		if (!contains(key)) {
+			return defaultValue;
+		}
+		Object value = get(key);
 		if (value == null) {
 			return null;
 		}
@@ -182,43 +218,71 @@ public final class AppSettings {
 	}
 
 	public int getInt(String key, int defaultValue) {
-		return parse(key, defaultValue, Integer::parseInt);
+		return get(key, Integer.class, defaultValue);
+	}
+
+	public byte getByte(String key, byte defaultValue) {
+		return get(key, Byte.class, defaultValue);
+	}
+
+	public short getShort(String key, short defaultValue) {
+		return get(key, Short.class, defaultValue);
 	}
 
 	public long getLong(String key, long defaultValue) {
-		return parse(key, defaultValue, Long::parseLong);
+		return get(key, Long.class, defaultValue);
+	}
+
+	public float getFloat(String key, float defaultValue) {
+		return get(key, Float.class, defaultValue);
 	}
 
 	public double getDouble(String key, double defaultValue) {
-		return parse(key, defaultValue, Double::parseDouble);
+		return get(key, Double.class, defaultValue);
+	}
+
+	public BigInteger getBigInteger(String key, BigInteger defaultValue) {
+		return get(key, BigInteger.class, defaultValue);
+	}
+
+	public BigDecimal getBigDecimal(String key, BigDecimal defaultValue) {
+		return get(key, BigDecimal.class, defaultValue);
 	}
 
 	public boolean getBoolean(String key, boolean defaultValue) {
-		String value = SettingsValues.raw(visibleValue(key), nullable);
-		if ("true".equalsIgnoreCase(value)) { //$NON-NLS-1$
-			return true;
-		}
-		if ("false".equalsIgnoreCase(value)) { //$NON-NLS-1$
-			return false;
-		}
-		return defaultValue;
+		return get(key, Boolean.class, defaultValue);
+	}
+
+	public char getChar(String key, char defaultValue) {
+		return get(key, Character.class, defaultValue);
 	}
 
 	public <T extends Enum<T>> T getEnum(String key, Class<T> enumType, T defaultValue) {
-		return parse(key, defaultValue, value -> Enum.valueOf(enumType, value));
+		return get(key, enumType, defaultValue);
 	}
 
 	public Locale getLocale(String key, Locale defaultValue) {
-		return parse(key, defaultValue, Locale::forLanguageTag);
+		return get(key, Locale.class, defaultValue);
 	}
 
 	public TimeZone getTimeZone(String key, TimeZone defaultValue) {
-		String value = SettingsValues.raw(visibleValue(key), nullable);
-		if (value == null || value.isBlank()) {
-			return defaultValue;
-		}
-		TimeZone timeZone = parseTimeZone(value);
-		return timeZone == null ? defaultValue : timeZone;
+		return get(key, TimeZone.class, defaultValue);
+	}
+
+	public ZoneId getZoneId(String key, ZoneId defaultValue) {
+		return get(key, ZoneId.class, defaultValue);
+	}
+
+	public Path getPath(String key, Path defaultValue) {
+		return get(key, Path.class, defaultValue);
+	}
+
+	public URI getUri(String key, URI defaultValue) {
+		return get(key, URI.class, defaultValue);
+	}
+
+	public List<Object> getList(String key) {
+		return getList(key, List.of());
 	}
 
 	public List<Object> getList(String key, List<?> defaultValue) {
@@ -230,6 +294,10 @@ public final class AppSettings {
 					.toList();
 		}
 		return Collections.unmodifiableList(new ArrayList<>(defaultValue));
+	}
+
+	public <T> List<T> getList(String key, Class<T> elementType) {
+		return getList(key, elementType, List.of());
 	}
 
 	public <T> List<T> getList(String key, Class<T> elementType, List<T> defaultValue) {
@@ -257,38 +325,38 @@ public final class AppSettings {
 	}
 
 	public Instant getInstant(String key, Instant defaultValue) {
-		return parse(key, defaultValue, Instant::parse);
+		return get(key, Instant.class, defaultValue);
 	}
 
 	public Date getDate(String key, Date defaultValue) {
-		return parse(key, defaultValue, value -> Date.from(Instant.parse(value)));
+		return get(key, Date.class, defaultValue);
 	}
 
 	public LocalDateTime getLocalDateTime(String key, LocalDateTime defaultValue) {
-		return parse(key, defaultValue, LocalDateTime::parse);
+		return get(key, LocalDateTime.class, defaultValue);
 	}
 
 	public LocalDate getLocalDate(String key, LocalDate defaultValue) {
-		return parse(key, defaultValue, LocalDate::parse);
+		return get(key, LocalDate.class, defaultValue);
 	}
 
 	public LocalTime getLocalTime(String key, LocalTime defaultValue) {
-		return parse(key, defaultValue, LocalTime::parse);
+		return get(key, LocalTime.class, defaultValue);
 	}
 
 	public OffsetDateTime getOffsetDateTime(String key, OffsetDateTime defaultValue) {
-		return parse(key, defaultValue, OffsetDateTime::parse);
+		return get(key, OffsetDateTime.class, defaultValue);
 	}
 
 	public ZonedDateTime getZonedDateTime(String key, ZonedDateTime defaultValue) {
-		return parse(key, defaultValue, ZonedDateTime::parse);
+		return get(key, ZonedDateTime.class, defaultValue);
 	}
 
 	/**
 	 * Stores a value. Supported values include strings, numbers, booleans,
 	 * date/time types, collections, enums, locales, time zones, and null.
 	 */
-	public AppSettings setValue(String key, Object value) {
+	public AppSettings set(String key, Object value) {
 		requireKey(key);
 		values.put(key, SettingsValues.of(value));
 		return this;
@@ -319,6 +387,15 @@ public final class AppSettings {
 	}
 
 	/**
+	 * Sets the time zone used when converting between timeline and local date/time
+	 * values.
+	 */
+	public AppSettings timeZone(TimeZone timeZone) {
+		this.timeZone = Objects.requireNonNull(timeZone, "timeZone"); //$NON-NLS-1$
+		return this;
+	}
+
+	/**
 	 * Overrides the storage format selected from the file name.
 	 */
 	public AppSettings format(SettingsFormat format) {
@@ -342,7 +419,7 @@ public final class AppSettings {
 	/**
 	 * Returns visible values as typed Java objects in insertion order.
 	 */
-	public Map<String, Object> asValueMap() {
+	public Map<String, Object> asMap() {
 		LinkedHashMap<String, Object> objectValues = new LinkedHashMap<>();
 		for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
 			if (isVisible(entry.getValue())) {
@@ -406,7 +483,7 @@ public final class AppSettings {
 			if (format instanceof InternalSettingsFormat internalFormat) {
 				internalFormat.writeValues(writer, values, comments, nullable);
 			} else {
-				format.write(writer, asValueMap(), comments);
+				format.write(writer, asMap(), comments);
 			}
 		}
 	}
@@ -446,18 +523,6 @@ public final class AppSettings {
 		return userHome;
 	}
 
-	private <T> T parse(String key, T defaultValue, ValueParser<T> parser) {
-		String value = SettingsValues.raw(visibleValue(key), nullable);
-		if (value == null || value.isBlank()) {
-			return defaultValue;
-		}
-		try {
-			return parser.parse(value);
-		} catch (RuntimeException e) {
-			return defaultValue;
-		}
-	}
-
 	private SettingsValue visibleValue(String key) {
 		SettingsValue value = values.get(key);
 		return isVisible(value) ? value : null;
@@ -467,99 +532,7 @@ public final class AppSettings {
 		return value != null && (nullable || !(value instanceof SettingsValue.NullValue));
 	}
 
-	@FunctionalInterface
-	private interface ValueParser<T> {
-		T parse(String value);
-	}
-
-	private static <T> T convertValue(Object value, Class<T> type) {
-		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
-		Class<?> wrapperType = wrapperType(type);
-		if (wrapperType.isInstance(value)) {
-			return castValue(value, type);
-		}
-		String raw = value.toString();
-		try {
-			Object converted = switch (wrapperType.getName()) {
-			case "java.lang.String" -> raw; //$NON-NLS-1$
-			case "java.lang.Byte" -> Byte.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Short" -> Short.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Integer" -> Integer.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Long" -> Long.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Float" -> Float.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Double" -> Double.valueOf(raw); //$NON-NLS-1$
-			case "java.lang.Character" -> parseCharacter(raw); //$NON-NLS-1$
-			case "java.math.BigDecimal" -> new BigDecimal(raw); //$NON-NLS-1$
-			case "java.lang.Boolean" -> parseBoolean(raw); //$NON-NLS-1$
-			case "java.time.Instant" -> Instant.parse(raw); //$NON-NLS-1$
-			case "java.util.Date" -> Date.from(Instant.parse(raw)); //$NON-NLS-1$
-			case "java.time.LocalDateTime" -> LocalDateTime.parse(raw); //$NON-NLS-1$
-			case "java.time.LocalDate" -> LocalDate.parse(raw); //$NON-NLS-1$
-			case "java.time.LocalTime" -> LocalTime.parse(raw); //$NON-NLS-1$
-			case "java.time.OffsetDateTime" -> OffsetDateTime.parse(raw); //$NON-NLS-1$
-			case "java.time.ZonedDateTime" -> ZonedDateTime.parse(raw); //$NON-NLS-1$
-			case "java.util.Locale" -> Locale.forLanguageTag(raw); //$NON-NLS-1$
-			case "java.util.TimeZone" -> parseTimeZone(raw); //$NON-NLS-1$
-			default -> convertEnum(raw, wrapperType);
-			};
-			return castValue(converted, type);
-		} catch (RuntimeException e) {
-			return null;
-		}
-	}
-
-	private static Class<?> wrapperType(Class<?> type) {
-		return type.isPrimitive() ? PRIMITIVE_WRAPPERS.get(type) : type;
-	}
-
-	@SuppressWarnings("unchecked")
-	private static <T> T castValue(Object value, Class<T> type) {
-		return (T) wrapperType(type).cast(value);
-	}
-
-	private static Map<Class<?>, Class<?>> primitiveWrappers() {
-		Map<Class<?>, Class<?>> wrappers = new HashMap<>();
-		wrappers.put(boolean.class, Boolean.class);
-		wrappers.put(byte.class, Byte.class);
-		wrappers.put(short.class, Short.class);
-		wrappers.put(int.class, Integer.class);
-		wrappers.put(long.class, Long.class);
-		wrappers.put(float.class, Float.class);
-		wrappers.put(double.class, Double.class);
-		wrappers.put(char.class, Character.class);
-		return Map.copyOf(wrappers);
-	}
-
-	private static Boolean parseBoolean(String value) {
-		if ("true".equalsIgnoreCase(value)) { //$NON-NLS-1$
-			return Boolean.TRUE;
-		}
-		if ("false".equalsIgnoreCase(value)) { //$NON-NLS-1$
-			return Boolean.FALSE;
-		}
-		throw new IllegalArgumentException("not a boolean: " + value); //$NON-NLS-1$
-	}
-
-	private static Character parseCharacter(String value) {
-		if (value.length() != 1) {
-			throw new IllegalArgumentException("not a character: " + value); //$NON-NLS-1$
-		}
-		return value.charAt(0);
-	}
-
-	private static TimeZone parseTimeZone(String value) {
-		try {
-			return TimeZone.getTimeZone(ZoneId.of(value));
-		} catch (DateTimeException e) {
-			return null;
-		}
-	}
-
-	@SuppressWarnings({ "rawtypes", "unchecked" })
-	private static Object convertEnum(String value, Class<?> type) {
-		if (type.isEnum()) {
-			return Enum.valueOf((Class<? extends Enum>) type, value);
-		}
-		return null;
+	private <T> T convertValue(Object value, Class<T> type) {
+		return SettingsConverter.convert(value, type, timeZone);
 	}
 }
