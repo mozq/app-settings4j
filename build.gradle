@@ -1,0 +1,71 @@
+plugins {
+  id 'java-library'
+  id 'maven-publish'
+}
+
+group = 'net.mozq'
+version = providers.gradleProperty('version')
+    .orElse(providers.environmentVariable('VERSION'))
+    .orElse('1.0.0-SNAPSHOT')
+    .get()
+
+dependencies {
+  testImplementation 'org.junit.jupiter:junit-jupiter:5.14.1'
+  testRuntimeOnly 'org.junit.platform:junit-platform-launcher'
+}
+
+repositories {
+  mavenCentral()
+}
+
+java {
+  withJavadocJar()
+  withSourcesJar()
+}
+
+tasks.withType(JavaCompile).configureEach {
+  options.encoding = 'UTF-8'
+}
+
+tasks.named('compileJava') {
+  options.release = 21
+}
+
+tasks.withType(Javadoc).configureEach {
+  options.encoding = 'UTF-8'
+  options.charSet = 'UTF-8'
+  options.addStringOption('Xdoclint:all,-missing', '-quiet')
+}
+
+tasks.withType(Jar).configureEach {
+  from('LICENSE') {
+    into 'META-INF'
+  }
+}
+
+tasks.named('test') {
+  useJUnitPlatform()
+}
+
+tasks.withType(AbstractArchiveTask).configureEach {
+  preserveFileTimestamps = false
+  reproducibleFileOrder = true
+}
+
+publishing {
+  publications {
+    mavenJava(MavenPublication) {
+      from components.java
+      pom {
+        name = 'app-settings4j'
+        description = 'A small Java library for OS-specific application settings.'
+        licenses {
+          license {
+            name = 'The Apache License, Version 2.0'
+            url = 'https://www.apache.org/licenses/LICENSE-2.0.txt'
+          }
+        }
+      }
+    }
+  }
+}
