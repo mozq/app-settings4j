@@ -31,6 +31,8 @@ import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
 import java.util.TimeZone;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
 
 /**
  * Reads and writes ordered application settings in the standard configuration
@@ -42,6 +44,7 @@ public final class AppSettings {
 	private final String fileName;
 	private final AppEnvironment environment;
 	private final LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+	private final ReadWriteLock lock = new ReentrantReadWriteLock();
 	private SettingsFormat format;
 	private TimeZone timeZone = TimeZone.getDefault();
 	private boolean nullable;
@@ -90,20 +93,25 @@ public final class AppSettings {
 	 * first.
 	 */
 	public AppSettings loadFrom(Path file) throws IOException {
-		values.clear();
-		if (!Files.exists(file)) {
-			return this;
-		}
-		try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
-			if (format instanceof InternalSettingsFormat internalFormat) {
-				values.putAll(internalFormat.readValues(reader));
-			} else {
-				for (Map.Entry<String, Object> entry : format.read(reader).entrySet()) {
-					values.put(entry.getKey(), SettingsValues.of(entry.getValue()));
+		lock.writeLock().lock();
+		try {
+			values.clear();
+			if (!Files.exists(file)) {
+				return this;
+			}
+			try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
+				if (format instanceof InternalSettingsFormat internalFormat) {
+					values.putAll(internalFormat.readValues(reader));
+				} else {
+					for (Map.Entry<String, Object> entry : format.read(reader).entrySet()) {
+						values.put(entry.getKey(), SettingsValues.of(entry.getValue()));
+					}
 				}
 			}
+			return this;
+		} finally {
+			lock.writeLock().unlock();
 		}
-		return this;
 	}
 
 	/**
@@ -131,12 +139,17 @@ public final class AppSettings {
 	 * Stores settings to the given file with optional file-level comments.
 	 */
 	public AppSettings storeTo(Path file, String comments) throws IOException {
-		Path parent = file.getParent();
-		if (parent != null) {
-			Files.createDirectories(parent);
+		lock.readLock().lock();
+		try {
+			Path parent = file.getParent();
+			if (parent != null) {
+				Files.createDirectories(parent);
+			}
+			storeAtomicallyOrDirect(file, comments);
+			return this;
+		} finally {
+			lock.readLock().unlock();
 		}
-		storeAtomicallyOrDirect(file, comments);
-		return this;
 	}
 
 	/**
@@ -144,15 +157,20 @@ public final class AppSettings {
 	 * missing, null-hidden, or has no string representation.
 	 */
 	public String getString(String key, String defaultValue) {
-		if (!contains(key)) {
-			return defaultValue;
+		lock.readLock().lock();
+		try {
+			if (!contains(key)) {
+				return defaultValue;
+			}
+			SettingsValue settingsValue = values.get(key);
+			if (settingsValue instanceof SettingsValue.NullValue) {
+				return null;
+			}
+			String value = SettingsValues.raw(settingsValue, nullable);
+			return value == null ? defaultValue : value;
+		} finally {
+			lock.readLock().unlock();
 		}
-		SettingsValue settingsValue = values.get(key);
-		if (settingsValue instanceof SettingsValue.NullValue) {
-			return null;
-		}
-		String value = SettingsValues.raw(settingsValue, nullable);
-		return value == null ? defaultValue : value;
 	}
 
 	/**
@@ -166,30 +184,40 @@ public final class AppSettings {
 	 * Returns the typed Java value for a key, or {@code null} when unavailable.
 	 */
 	public Object get(String key) {
-		if (!contains(key)) {
-			return null;
+		lock.readLock().lock();
+		try {
+			if (!contains(key)) {
+				return null;
+			}
+			return SettingsValues.object(values.get(key), nullable);
+		} finally {
+			lock.readLock().unlock();
 		}
-		return SettingsValues.object(values.get(key), nullable);
 	}
 
 	/**
 	 * Converts the value for a key to the default value type when possible.
 	 */
 	public <T> T get(String key, T defaultValue) {
-		if (!contains(key)) {
-			return defaultValue;
+		lock.readLock().lock();
+		try {
+			if (!contains(key)) {
+				return defaultValue;
+			}
+			Object value = get(key);
+			if (value == null) {
+				return null;
+			}
+			if (defaultValue == null) {
+				return null;
+			}
+			@SuppressWarnings("unchecked")
+			Class<T> type = (Class<T>) defaultValue.getClass();
+			T converted = convertValue(value, type);
+			return converted == null ? defaultValue : converted;
+		} finally {
+			lock.readLock().unlock();
 		}
-		Object value = get(key);
-		if (value == null) {
-			return null;
-		}
-		if (defaultValue == null) {
-			return null;
-		}
-		@SuppressWarnings("unchecked")
-		Class<T> type = (Class<T>) defaultValue.getClass();
-		T converted = convertValue(value, type);
-		return converted == null ? defaultValue : converted;
 	}
 
 	/**
@@ -206,15 +234,20 @@ public final class AppSettings {
 	 */
 	public <T> T get(String key, Class<T> type, T defaultValue) {
 		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
-		if (!contains(key)) {
-			return defaultValue;
+		lock.readLock().lock();
+		try {
+			if (!contains(key)) {
+				return defaultValue;
+			}
+			Object value = get(key);
+			if (value == null) {
+				return null;
+			}
+			T converted = convertValue(value, type);
+			return converted == null ? defaultValue : converted;
+		} finally {
+			lock.readLock().unlock();
 		}
-		Object value = get(key);
-		if (value == null) {
-			return null;
-		}
-		T converted = convertValue(value, type);
-		return converted == null ? defaultValue : converted;
 	}
 
 	public int getInt(String key, int defaultValue) {
@@ -286,17 +319,22 @@ public final class AppSettings {
 	}
 
 	public List<Object> getList(String key, List<?> defaultValue) {
-		SettingsValue value = visibleValue(key);
-		if (value instanceof SettingsValue.ListValue listValue) {
-			return listValue.values().stream()
-					.filter(item -> nullable || !(item instanceof SettingsValue.NullValue))
-					.map(item -> SettingsValues.object(item, nullable))
-					.toList();
+		lock.readLock().lock();
+		try {
+			SettingsValue value = visibleValue(key);
+			if (value instanceof SettingsValue.ListValue listValue) {
+				return listValue.values().stream()
+						.filter(item -> nullable || !(item instanceof SettingsValue.NullValue))
+						.map(item -> SettingsValues.object(item, nullable))
+						.toList();
+			}
+			if (defaultValue.isEmpty()) {
+				return List.of();
+			}
+			return Collections.unmodifiableList(new ArrayList<>(defaultValue));
+		} finally {
+			lock.readLock().unlock();
 		}
-		if (defaultValue.isEmpty()) {
-			return List.of();
-		}
-		return Collections.unmodifiableList(new ArrayList<>(defaultValue));
 	}
 
 	public <T> List<T> getList(String key, Class<T> elementType) {
@@ -304,30 +342,35 @@ public final class AppSettings {
 	}
 
 	public <T> List<T> getList(String key, Class<T> elementType, List<T> defaultValue) {
-		SettingsValue value = visibleValue(key);
-		if (!(value instanceof SettingsValue.ListValue listValue)) {
-			return defaultValue;
-		}
-		List<T> converted = new ArrayList<>(listValue.values().size());
-		for (SettingsValue item : listValue.values()) {
-			if (item instanceof SettingsValue.NullValue && !nullable) {
-				continue;
-			}
-			Object object = SettingsValues.object(item, nullable);
-			if (object == null) {
-				converted.add(null);
-				continue;
-			}
-			T convertedItem = convertValue(object, elementType);
-			if (convertedItem == null) {
+		lock.readLock().lock();
+		try {
+			SettingsValue value = visibleValue(key);
+			if (!(value instanceof SettingsValue.ListValue listValue)) {
 				return defaultValue;
 			}
-			converted.add(convertedItem);
+			List<T> converted = new ArrayList<>(listValue.values().size());
+			for (SettingsValue item : listValue.values()) {
+				if (item instanceof SettingsValue.NullValue && !nullable) {
+					continue;
+				}
+				Object object = SettingsValues.object(item, nullable);
+				if (object == null) {
+					converted.add(null);
+					continue;
+				}
+				T convertedItem = convertValue(object, elementType);
+				if (convertedItem == null) {
+					return defaultValue;
+				}
+				converted.add(convertedItem);
+			}
+			if (converted.isEmpty()) {
+				return List.of();
+			}
+			return Collections.unmodifiableList(converted);
+		} finally {
+			lock.readLock().unlock();
 		}
-		if (converted.isEmpty()) {
-			return List.of();
-		}
-		return Collections.unmodifiableList(converted);
 	}
 
 	public Instant getInstant(String key, Instant defaultValue) {
@@ -364,75 +407,94 @@ public final class AppSettings {
 	 */
 	public AppSettings set(String key, Object value) {
 		requireKey(key);
-		values.put(key, SettingsValues.of(value));
-		return this;
+		lock.writeLock().lock();
+		try {
+			values.put(key, SettingsValues.of(value));
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
-	/**
-	 * Returns whether a key is visible. Null values are hidden unless nullable mode
-	 * is enabled.
-	 */
 	public boolean contains(String key) {
-		return visibleValue(key) != null;
+		lock.readLock().lock();
+		try {
+			return visibleValue(key) != null;
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
-	/**
-	 * Removes a key from the in-memory settings.
-	 */
 	public AppSettings remove(String key) {
-		values.remove(key);
-		return this;
+		lock.writeLock().lock();
+		try {
+			values.remove(key);
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
-	/**
-	 * Controls whether null values behave as visible values.
-	 */
 	public AppSettings nullable(boolean nullable) {
-		this.nullable = nullable;
-		return this;
+		lock.writeLock().lock();
+		try {
+			this.nullable = nullable;
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
-	/**
-	 * Sets the time zone used when converting between timeline and local date/time
-	 * values.
-	 */
 	public AppSettings timeZone(TimeZone timeZone) {
-		this.timeZone = Objects.requireNonNull(timeZone, "timeZone"); //$NON-NLS-1$
-		return this;
+		Objects.requireNonNull(timeZone, "timeZone"); //$NON-NLS-1$
+		lock.writeLock().lock();
+		try {
+			this.timeZone = timeZone;
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
-	/**
-	 * Overrides the storage format selected from the file name.
-	 */
 	public AppSettings format(SettingsFormat format) {
-		this.format = Objects.requireNonNull(format, "format"); //$NON-NLS-1$
-		return this;
+		Objects.requireNonNull(format, "format"); //$NON-NLS-1$
+		lock.writeLock().lock();
+		try {
+			this.format = format;
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
 	}
 
-	/**
-	 * Returns visible values as raw strings in insertion order.
-	 */
 	public Map<String, String> asStringMap() {
-		LinkedHashMap<String, String> rawValues = new LinkedHashMap<>();
-		for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
-			if (isVisible(entry.getValue())) {
-				rawValues.put(entry.getKey(), SettingsValues.raw(entry.getValue(), nullable));
+		lock.readLock().lock();
+		try {
+			LinkedHashMap<String, String> rawValues = new LinkedHashMap<>();
+			for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
+				if (isVisible(entry.getValue())) {
+					rawValues.put(entry.getKey(), SettingsValues.raw(entry.getValue(), nullable));
+				}
 			}
+			return Collections.unmodifiableMap(rawValues);
+		} finally {
+			lock.readLock().unlock();
 		}
-		return Collections.unmodifiableMap(rawValues);
 	}
 
-	/**
-	 * Returns visible values as typed Java objects in insertion order.
-	 */
 	public Map<String, Object> asMap() {
-		LinkedHashMap<String, Object> objectValues = new LinkedHashMap<>();
-		for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
-			if (isVisible(entry.getValue())) {
-				objectValues.put(entry.getKey(), SettingsValues.object(entry.getValue(), nullable));
+		lock.readLock().lock();
+		try {
+			LinkedHashMap<String, Object> objectValues = new LinkedHashMap<>();
+			for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
+				if (isVisible(entry.getValue())) {
+					objectValues.put(entry.getKey(), SettingsValues.object(entry.getValue(), nullable));
+				}
 			}
+			return Collections.unmodifiableMap(objectValues);
+		} finally {
+			lock.readLock().unlock();
 		}
-		return Collections.unmodifiableMap(objectValues);
 	}
 
 	private void storeAtomicallyOrDirect(Path file, String comments) throws IOException {

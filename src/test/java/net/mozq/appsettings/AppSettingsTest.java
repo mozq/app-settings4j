@@ -36,6 +36,12 @@ import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.ArrayList;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.junit.jupiter.api.Nested;
 import org.junit.jupiter.api.Test;
@@ -802,6 +808,42 @@ class AppSettingsTest {
 			AppSettings settings = settings("acme", "notes", "settings.custom"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
 
 			assertThrows(NullPointerException.class, () -> settings.format(null));
+		}
+	}
+
+	@Nested
+	class ConcurrentAccess {
+		@Test
+		void handlesConcurrentReadsAndWrites() throws Exception {
+			AppSettings settings = settings("acme", "notes", "settings.properties"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+			int threadCount = 10;
+			int iterations = 100;
+			ExecutorService executor = Executors.newFixedThreadPool(threadCount);
+			CountDownLatch latch = new CountDownLatch(1);
+			List<Future<?>> futures = new ArrayList<>();
+
+			for (int i = 0; i < threadCount; i++) {
+				final int threadId = i;
+				futures.add(executor.submit(() -> {
+					latch.await();
+					for (int j = 0; j < iterations; j++) {
+						if (threadId % 2 == 0) {
+							settings.set("key_" + threadId + "_" + j, j); //$NON-NLS-1$ //$NON-NLS-2$
+						} else {
+							settings.getString("key_" + (threadId - 1) + "_" + j, "default"); //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$
+							settings.asMap();
+						}
+					}
+					return null;
+				}));
+			}
+
+			latch.countDown();
+			for (Future<?> future : futures) {
+				future.get();
+			}
+			executor.shutdown();
+			assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
 		}
 	}
 
