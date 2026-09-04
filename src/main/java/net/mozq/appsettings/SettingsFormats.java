@@ -56,13 +56,13 @@ public final class SettingsFormats {
 			return keyValue();
 		}
 		String lowerFileName = fileName.toLowerCase(Locale.ROOT);
-		if (lowerFileName.endsWith(".ini")) { //$NON-NLS-1$
+		if (lowerFileName.endsWith(".ini")) {
 			return ini();
 		}
-		if (lowerFileName.endsWith(".yaml") || lowerFileName.endsWith(".yml")) { //$NON-NLS-1$ //$NON-NLS-2$
+		if (lowerFileName.endsWith(".yaml") || lowerFileName.endsWith(".yml")) {
 			return simpleYaml();
 		}
-		if (lowerFileName.endsWith(".json")) { //$NON-NLS-1$
+		if (lowerFileName.endsWith(".json")) {
 			return json();
 		}
 		return keyValue();

@@ -155,7 +155,7 @@ final class SettingsValues {
 				continue;
 			}
 			if (wrote) {
-				builder.append(", "); //$NON-NLS-1$
+				builder.append(", ");
 			}
 			builder.append(escapeListElement(value));
 			wrote = true;
@@ -166,7 +166,7 @@ final class SettingsValues {
 	private static String escapeListElement(SettingsValue value) {
 		String raw = value.raw();
 		if (raw == null) {
-			return "null"; //$NON-NLS-1$
+			return "null";
 		}
 		if (shouldQuoteListString(value)) {
 			return quote(raw);
@@ -219,11 +219,11 @@ final class SettingsValues {
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			switch (c) {
-			case '\\': quoted.append("\\\\"); break; //$NON-NLS-1$
-			case '"': quoted.append("\\\""); break; //$NON-NLS-1$
-			case '\n': quoted.append("\\n"); break; //$NON-NLS-1$
-			case '\r': quoted.append("\\r"); break; //$NON-NLS-1$
-			case '\t': quoted.append("\\t"); break; //$NON-NLS-1$
+			case '\\': quoted.append("\\\\"); break;
+			case '"': quoted.append("\\\""); break;
+			case '\n': quoted.append("\\n"); break;
+			case '\r': quoted.append("\\r"); break;
+			case '\t': quoted.append("\\t"); break;
 			default: quoted.append(c);
 			}
 		}

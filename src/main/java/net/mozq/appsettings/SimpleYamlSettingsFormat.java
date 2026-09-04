@@ -17,7 +17,7 @@ import java.util.List;
 import java.util.Map;
 
 final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
-	private static final String NODE_VALUE_KEY = "@"; //$NON-NLS-1$
+	private static final String NODE_VALUE_KEY = "@";
 	private static final char SINGLE_QUOTE = '\'';
 	private static final char DOUBLE_QUOTE = '"';
 
@@ -35,17 +35,17 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 			}
 			int indent = countIndent(withoutComment);
 			if (indent % 2 != 0) {
-				throw new AppSettingsException("YAML indentation must use multiples of two spaces"); //$NON-NLS-1$
+				throw new AppSettingsException("YAML indentation must use multiples of two spaces");
 			}
 			int level = indent / 2;
 			while (path.size() > level) {
 				path.removeLast();
 			}
 			String item = withoutComment.substring(indent);
-			if (item.startsWith("- ")) { //$NON-NLS-1$
-				String fullKey = String.join(".", path); //$NON-NLS-1$
+			if (item.startsWith("- ")) {
+				String fullKey = String.join(".", path);
 				if (fullKey.isEmpty()) {
-					throw new AppSettingsException("YAML list entries must belong to a key"); //$NON-NLS-1$
+					throw new AppSettingsException("YAML list entries must belong to a key");
 				}
 				List<SettingsValue> list = lists.computeIfAbsent(fullKey, key -> new ArrayList<>());
 				SettingsValue itemValue = parseValue(item.substring(2).strip());
@@ -55,16 +55,16 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 			}
 			int separator = findEntrySeparator(item);
 			if (separator < 0) {
-				throw new AppSettingsException("YAML entries must use key: value syntax"); //$NON-NLS-1$
+				throw new AppSettingsException("YAML entries must use key: value syntax");
 			}
 			String key = parseKey(item.substring(0, separator).strip());
 			String value = item.substring(separator + 1).strip();
 			if (value.isEmpty()) {
 				path.add(key);
 			} else {
-				String fullKey = NODE_VALUE_KEY.equals(key) ? String.join(".", path) : join(path, key); //$NON-NLS-1$
+				String fullKey = NODE_VALUE_KEY.equals(key) ? String.join(".", path) : join(path, key);
 				if (fullKey.isEmpty()) {
-					throw new AppSettingsException("@ is reserved for nested values"); //$NON-NLS-1$
+					throw new AppSettingsException("@ is reserved for nested values");
 				}
 				values.put(fullKey, parseValue(value));
 			}
@@ -76,8 +76,8 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
 		BufferedWriter bufferedWriter = new BufferedWriter(writer);
 		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) { //$NON-NLS-1$
-				bufferedWriter.write("# "); //$NON-NLS-1$
+			for (String line : comments.split("\\R")) {
+				bufferedWriter.write("# ");
 				bufferedWriter.write(line);
 				bufferedWriter.newLine();
 			}
@@ -99,12 +99,12 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 				writer.newLine();
 				if (child.hasWritableValue(nullable)) {
 					writeIndent(writer, level + 1);
-					writer.write("'@': "); //$NON-NLS-1$
+					writer.write("'@': ");
 					writeValue(writer, child.value(), level + 1, nullable);
 				}
 				writeNode(writer, child, level + 1, nullable);
 			} else {
-				writer.write(": "); //$NON-NLS-1$
+				writer.write(": ");
 				writeValue(writer, child.value(), level, nullable);
 			}
 		}
@@ -112,7 +112,7 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 
 	private static void writeValue(BufferedWriter writer, SettingsValue value, int level, boolean nullable) throws IOException {
 		if (value instanceof SettingsValue.NullValue && nullable) {
-			writer.write("null"); //$NON-NLS-1$
+			writer.write("null");
 			writer.newLine();
 			return;
 		}
@@ -181,11 +181,11 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 		if (path.isEmpty()) {
 			return key;
 		}
-		return String.join(".", path) + "." + key; //$NON-NLS-1$ //$NON-NLS-2$
+		return String.join(".", path) + "." + key;
 	}
 
 	private static String quoteKey(String key) {
-		if (NODE_VALUE_KEY.equals(key) || key.contains(":") || key.contains("#") || key.isBlank()) { //$NON-NLS-1$ //$NON-NLS-2$
+		if (NODE_VALUE_KEY.equals(key) || key.contains(":") || key.contains("#") || key.isBlank()) {
 			return quoteSingle(key);
 		}
 		return key;
@@ -216,7 +216,7 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 
 	private static String formatScalar(SettingsValue value) {
 		if (value instanceof SettingsValue.NullValue) {
-			return "null"; //$NON-NLS-1$
+			return "null";
 		}
 		if (value instanceof SettingsValue.NumberValue || value instanceof SettingsValue.BooleanValue) {
 			return SettingsValues.raw(value);
@@ -225,14 +225,14 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static String formatInlineList(SettingsValue.ListValue listValue, boolean nullable) {
-		StringBuilder builder = new StringBuilder("["); //$NON-NLS-1$
+		StringBuilder builder = new StringBuilder("[");
 		boolean wrote = false;
 		for (SettingsValue item : listValue.values()) {
 			if (item instanceof SettingsValue.NullValue && !nullable) {
 				continue;
 			}
 			if (wrote) {
-				builder.append(", "); //$NON-NLS-1$
+				builder.append(", ");
 			}
 			builder.append(formatScalar(item));
 			wrote = true;
@@ -278,7 +278,7 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static boolean isInlineList(String value) {
-		return value.startsWith("[") && value.endsWith("]"); //$NON-NLS-1$ //$NON-NLS-2$
+		return value.startsWith("[") && value.endsWith("]");
 	}
 
 	private static boolean isSingleQuoted(String value) {
@@ -290,7 +290,7 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static String unquoteSingle(String value) {
-		return value.substring(1, value.length() - 1).replace("''", "'"); //$NON-NLS-1$ //$NON-NLS-2$
+		return value.substring(1, value.length() - 1).replace("''", "'");
 	}
 
 	private static String quoteYamlString(String value) {
@@ -301,12 +301,12 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static String quoteSingle(String value) {
-		return SINGLE_QUOTE + value.replace("'", "''") + SINGLE_QUOTE; //$NON-NLS-1$ //$NON-NLS-2$
+		return SINGLE_QUOTE + value.replace("'", "''") + SINGLE_QUOTE;
 	}
 
 	private static void writeIndent(BufferedWriter writer, int level) throws IOException {
 		for (int i = 0; i < level; i++) {
-			writer.write("  "); //$NON-NLS-1$
+			writer.write("  ");
 		}
 	}
 }

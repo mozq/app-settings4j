@@ -11,8 +11,8 @@ import java.util.Map;
 record AppEnvironment(String osName, String userHome, Map<String, String> env) {
 	static AppEnvironment current() {
 		return new AppEnvironment(
-				System.getProperty("os.name"), //$NON-NLS-1$
-				System.getProperty("user.home"), //$NON-NLS-1$
+				System.getProperty("os.name"),
+				System.getProperty("user.home"),
 				System.getenv());
 	}
 

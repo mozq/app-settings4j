@@ -43,7 +43,7 @@ final class TextSettingsCodec {
 
 	private static String escapeSettingValue(SettingsValue value, boolean nullable, boolean keyValueStyle) {
 		if (value instanceof SettingsValue.NullValue && nullable) {
-			return "null"; //$NON-NLS-1$
+			return "null";
 		}
 		if (value instanceof SettingsValue.ListValue listValue) {
 			return SettingsValues.formatList(listValue.values(), nullable);

@@ -15,7 +15,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 
 final class IniSettingsFormat implements InternalSettingsFormat {
-	private static final String NODE_VALUE_KEY = "@"; //$NON-NLS-1$
+	private static final String NODE_VALUE_KEY = "@";
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
@@ -25,27 +25,27 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 		String line;
 		while ((line = bufferedReader.readLine()) != null) {
 			String trimmed = line.strip();
-			if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) { //$NON-NLS-1$ //$NON-NLS-2$
+			if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) {
 				continue;
 			}
-			if (trimmed.startsWith("[") && trimmed.endsWith("]")) { //$NON-NLS-1$ //$NON-NLS-2$
+			if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
 				section = trimmed.substring(1, trimmed.length() - 1).trim();
 				continue;
 			}
 			int separator = TextSettingsCodec.findSeparator(line);
 			String rawKey = separator < 0 ? line.strip() : line.substring(0, separator).strip();
 			String key = SettingsValues.unescape(rawKey);
-			String rawValue = separator < 0 ? "" : line.substring(separator + 1); //$NON-NLS-1$
+			String rawValue = separator < 0 ? "" : line.substring(separator + 1);
 			SettingsValue value = separator < 0 ? SettingsValues.nullValue() : SettingsValues.inferEscaped(rawValue);
 			if (NODE_VALUE_KEY.equals(key)) {
 				if (section == null || section.isEmpty()) {
-					throw new AppSettingsException("@ is reserved for section values"); //$NON-NLS-1$
+					throw new AppSettingsException("@ is reserved for section values");
 				}
 				values.put(section, value);
 			} else if (section == null || section.isEmpty()) {
 				values.put(key, value);
 			} else {
-				values.put(section + "." + key, value); //$NON-NLS-1$
+				values.put(section + "." + key, value);
 			}
 		}
 		return values;
@@ -55,15 +55,15 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
 		BufferedWriter bufferedWriter = new BufferedWriter(writer);
 		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) { //$NON-NLS-1$
-				bufferedWriter.write("; "); //$NON-NLS-1$
+			for (String line : comments.split("\\R")) {
+				bufferedWriter.write("; ");
 				bufferedWriter.write(line);
 				bufferedWriter.newLine();
 			}
 		}
 		SettingsNode root = SettingsNode.from(values);
 		writeRootValues(bufferedWriter, root, nullable);
-		writeSections(bufferedWriter, "", root, nullable); //$NON-NLS-1$
+		writeSections(bufferedWriter, "", root, nullable);
 		bufferedWriter.flush();
 	}
 
@@ -84,7 +84,7 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 			if (!child.hasWritableContent(nullable)) {
 				continue;
 			}
-			String section = path.isEmpty() ? entry.getKey() : path + "." + entry.getKey(); //$NON-NLS-1$
+			String section = path.isEmpty() ? entry.getKey() : path + "." + entry.getKey();
 			writer.newLine();
 			writer.write('[' + section + ']');
 			writer.newLine();

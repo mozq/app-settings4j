@@ -49,14 +49,14 @@ final class SettingsNode {
 		return root;
 	}
 
-	private static final Pattern DOT_PATTERN = Pattern.compile("\\."); //$NON-NLS-1$
+	private static final Pattern DOT_PATTERN = Pattern.compile("\\.");
 
 	private void put(String key, SettingsValue value) {
 		String[] parts = DOT_PATTERN.split(key, -1);
 		SettingsNode node = this;
 		for (String part : parts) {
 			if (part.isEmpty()) {
-				throw new AppSettingsException("settings keys must not contain empty path segments"); //$NON-NLS-1$
+				throw new AppSettingsException("settings keys must not contain empty path segments");
 			}
 			node = node.children.computeIfAbsent(part, name -> new SettingsNode());
 		}

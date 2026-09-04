@@ -134,19 +134,19 @@ final class SettingsValueParser {
 	}
 
 	private static boolean isListLiteral(String value) {
-		return value.startsWith("[") && value.endsWith("]"); //$NON-NLS-1$ //$NON-NLS-2$
+		return value.startsWith("[") && value.endsWith("]");
 	}
 
 	private static boolean isNullLiteral(String normalized) {
-		return "null".equals(normalized); //$NON-NLS-1$
+		return "null".equals(normalized);
 	}
 
 	private static boolean isTrueLiteral(String normalized) {
-		return "true".equals(normalized); //$NON-NLS-1$
+		return "true".equals(normalized);
 	}
 
 	private static boolean isFalseLiteral(String normalized) {
-		return "false".equals(normalized); //$NON-NLS-1$
+		return "false".equals(normalized);
 	}
 
 	private static boolean isNumberCandidate(String s) {
@@ -172,7 +172,7 @@ final class SettingsValueParser {
 		TemporalAccessor parsed = null;
 		if (value.indexOf('[') >= 0) {
 			parsed = tryParse(value, ZonedDateTime::parse);
-		} else if (value.endsWith("Z")) { //$NON-NLS-1$
+		} else if (value.endsWith("Z")) {
 			parsed = tryParse(value, Instant::parse);
 		} else {
 			parsed = tryParse(value, OffsetDateTime::parse);

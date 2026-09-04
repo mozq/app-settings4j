@@ -63,9 +63,9 @@ public final class AppSettings {
 
 	private AppSettings(String vendor, String app, String fileName, AppEnvironment environment) {
 		this.vendor = normalizeVendor(vendor);
-		this.app = requirePathName(app, "app"); //$NON-NLS-1$
+		this.app = requirePathName(app, "app");
 		this.fileName = requireFileName(fileName);
-		this.environment = Objects.requireNonNull(environment, "environment"); //$NON-NLS-1$
+		this.environment = Objects.requireNonNull(environment, "environment");
 		this.format = SettingsFormats.byFileName(this.fileName);
 	}
 
@@ -225,7 +225,7 @@ public final class AppSettings {
 	 * unavailable.
 	 */
 	public <T> T get(String key, Class<T> type) {
-		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
+		Objects.requireNonNull(type, "type");
 		return get(key, type, null);
 	}
 
@@ -233,7 +233,7 @@ public final class AppSettings {
 	 * Converts the value for a key to the requested type when possible.
 	 */
 	public <T> T get(String key, Class<T> type, T defaultValue) {
-		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
+		Objects.requireNonNull(type, "type");
 		lock.readLock().lock();
 		try {
 			if (!contains(key)) {
@@ -446,7 +446,7 @@ public final class AppSettings {
 	}
 
 	public AppSettings timeZone(TimeZone timeZone) {
-		Objects.requireNonNull(timeZone, "timeZone"); //$NON-NLS-1$
+		Objects.requireNonNull(timeZone, "timeZone");
 		lock.writeLock().lock();
 		try {
 			this.timeZone = timeZone;
@@ -457,7 +457,7 @@ public final class AppSettings {
 	}
 
 	public AppSettings format(SettingsFormat format) {
-		Objects.requireNonNull(format, "format"); //$NON-NLS-1$
+		Objects.requireNonNull(format, "format");
 		lock.writeLock().lock();
 		try {
 			this.format = format;
@@ -505,7 +505,7 @@ public final class AppSettings {
 		}
 		Path temporaryFile;
 		try {
-			temporaryFile = Files.createTempFile(parent, file.getFileName().toString(), ".tmp"); //$NON-NLS-1$
+			temporaryFile = Files.createTempFile(parent, file.getFileName().toString(), ".tmp");
 		} catch (IOException e) {
 			writeTo(file, comments);
 			return;
@@ -527,23 +527,23 @@ public final class AppSettings {
 	}
 
 	private Path baseConfigDirectory() {
-		String osName = environment.osName() == null ? "" : environment.osName().toLowerCase(Locale.ROOT); //$NON-NLS-1$
+		String osName = environment.osName() == null ? "" : environment.osName().toLowerCase(Locale.ROOT);
 		String userHome = requireUserHome(environment.userHome());
-		if (osName.startsWith("windows")) { //$NON-NLS-1$
-			String appData = environment.getenv("APPDATA"); //$NON-NLS-1$
+		if (osName.startsWith("windows")) {
+			String appData = environment.getenv("APPDATA");
 			if (appData != null && !appData.isBlank()) {
 				return Path.of(appData);
 			}
-			return Path.of(userHome, "AppData", "Roaming"); //$NON-NLS-1$ //$NON-NLS-2$
+			return Path.of(userHome, "AppData", "Roaming");
 		}
-		if (osName.startsWith("mac")) { //$NON-NLS-1$
-			return Path.of(userHome, "Library", "Application Support"); //$NON-NLS-1$ //$NON-NLS-2$
+		if (osName.startsWith("mac")) {
+			return Path.of(userHome, "Library", "Application Support");
 		}
-		String xdgConfigHome = environment.getenv("XDG_CONFIG_HOME"); //$NON-NLS-1$
+		String xdgConfigHome = environment.getenv("XDG_CONFIG_HOME");
 		if (xdgConfigHome != null && !xdgConfigHome.isBlank()) {
 			return Path.of(xdgConfigHome);
 		}
-		return Path.of(userHome, ".config"); //$NON-NLS-1$
+		return Path.of(userHome, ".config");
 	}
 
 	private void writeTo(Path file, String comments) throws IOException {
@@ -560,33 +560,33 @@ public final class AppSettings {
 		if (vendor == null || vendor.isBlank()) {
 			return null;
 		}
-		return requirePathName(vendor, "vendor"); //$NON-NLS-1$
+		return requirePathName(vendor, "vendor");
 	}
 
 	private static String requirePathName(String value, String name) {
 		if (value == null || value.isBlank()) {
-			throw new IllegalArgumentException(name + " is required"); //$NON-NLS-1$
+			throw new IllegalArgumentException(name + " is required");
 		}
-		if (value.contains("/") || value.contains("\\") || value.equals(".") || value.equals("..")) { //$NON-NLS-1$ //$NON-NLS-2$ //$NON-NLS-3$ //$NON-NLS-4$
-			throw new IllegalArgumentException(name + " must be a path name, not a path"); //$NON-NLS-1$
+		if (value.contains("/") || value.contains("\\") || value.equals(".") || value.equals("..")) {
+			throw new IllegalArgumentException(name + " must be a path name, not a path");
 		}
 		return value;
 	}
 
 	private static String requireFileName(String value) {
-		return requirePathName(value, "fileName"); //$NON-NLS-1$
+		return requirePathName(value, "fileName");
 	}
 
 	private static String requireKey(String key) {
 		if (key == null || key.isEmpty()) {
-			throw new IllegalArgumentException("key is required"); //$NON-NLS-1$
+			throw new IllegalArgumentException("key is required");
 		}
 		return key;
 	}
 
 	private static String requireUserHome(String userHome) {
 		if (userHome == null || userHome.isBlank()) {
-			throw new AppSettingsException("user.home is required to resolve app settings path"); //$NON-NLS-1$
+			throw new AppSettingsException("user.home is required to resolve app settings path");
 		}
 		return userHome;
 	}

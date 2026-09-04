@@ -30,8 +30,8 @@ final class KeyValueSettingsFormat implements InternalSettingsFormat {
 	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
 		BufferedWriter bufferedWriter = new BufferedWriter(writer);
 		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) { //$NON-NLS-1$
-				bufferedWriter.write("# "); //$NON-NLS-1$
+			for (String line : comments.split("\\R")) {
+				bufferedWriter.write("# ");
 				bufferedWriter.write(line);
 				bufferedWriter.newLine();
 			}
@@ -50,7 +50,7 @@ final class KeyValueSettingsFormat implements InternalSettingsFormat {
 
 	private static void parseLine(Map<String, SettingsValue> values, String line) {
 		String trimmed = line.stripLeading();
-		if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) { //$NON-NLS-1$ //$NON-NLS-2$
+		if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) {
 			return;
 		}
 		int separator = TextSettingsCodec.findSeparator(line);

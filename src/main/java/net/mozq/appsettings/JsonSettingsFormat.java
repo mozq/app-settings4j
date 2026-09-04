@@ -16,7 +16,7 @@ import java.util.List;
 import java.util.Map;
 
 final class JsonSettingsFormat implements InternalSettingsFormat {
-	private static final String NODE_VALUE_KEY = "@"; //$NON-NLS-1$
+	private static final String NODE_VALUE_KEY = "@";
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
@@ -28,10 +28,10 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 		}
 		Object root = new Parser(content).parse();
 		if (!(root instanceof Map<?, ?> map)) {
-			throw new AppSettingsException("JSON settings must be an object"); //$NON-NLS-1$
+			throw new AppSettingsException("JSON settings must be an object");
 		}
 		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
-		flatten(values, "", map); //$NON-NLS-1$
+		flatten(values, "", map);
 		return values;
 	}
 
@@ -83,7 +83,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			}
 			return SettingsValues.list(SettingsValues.formatList(values), values);
 		}
-		throw new AppSettingsException("Unsupported JSON value: " + value); //$NON-NLS-1$
+		throw new AppSettingsException("Unsupported JSON value: " + value);
 	}
 
 	private static void writeNode(Writer writer, SettingsNode node, int level, boolean nullable) throws IOException {
@@ -127,12 +127,12 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			return;
 		}
 		writer.write(quote(key));
-		writer.write(": "); //$NON-NLS-1$
+		writer.write(": ");
 	}
 
 	private static void writeValue(Writer writer, SettingsValue value, int level, boolean nullable) throws IOException {
 		if (value instanceof SettingsValue.NullValue && nullable) {
-			writer.write("null"); //$NON-NLS-1$
+			writer.write("null");
 		} else if (value instanceof SettingsValue.NumberValue || value instanceof SettingsValue.BooleanValue) {
 			writer.write(SettingsValues.raw(value));
 		} else if (value instanceof SettingsValue.ListValue listValue) {
@@ -148,7 +148,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				} else {
 					writer.write(System.lineSeparator());
 				}
-				writeEntryPrefix(writer, "", level + 1, true); //$NON-NLS-1$
+				writeEntryPrefix(writer, "", level + 1, true);
 				writeValue(writer, item, level + 1, nullable);
 				wrote = true;
 			}
@@ -163,7 +163,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static String join(String path, String key) {
-		return path.isEmpty() ? key : path + "." + key; //$NON-NLS-1$
+		return path.isEmpty() ? key : path + "." + key;
 	}
 
 	private static String quote(String value) {
@@ -172,14 +172,14 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			switch (c) {
-			case '\\': quoted.append("\\\\"); break; //$NON-NLS-1$
-			case '"': quoted.append("\\\""); break; //$NON-NLS-1$
-			case '\n': quoted.append("\\n"); break; //$NON-NLS-1$
-			case '\r': quoted.append("\\r"); break; //$NON-NLS-1$
-			case '\t': quoted.append("\\t"); break; //$NON-NLS-1$
+			case '\\': quoted.append("\\\\"); break;
+			case '"': quoted.append("\\\""); break;
+			case '\n': quoted.append("\\n"); break;
+			case '\r': quoted.append("\\r"); break;
+			case '\t': quoted.append("\\t"); break;
 			default:
 				if (c < 0x20) {
-					quoted.append(String.format("\\u%04x", (int) c)); //$NON-NLS-1$
+					quoted.append(String.format("\\u%04x", (int) c));
 				} else {
 					quoted.append(c);
 				}
@@ -190,7 +190,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 
 	private static void writeIndent(Writer writer, int level) throws IOException {
 		for (int i = 0; i < level; i++) {
-			writer.write("  "); //$NON-NLS-1$
+			writer.write("  ");
 		}
 	}
 
@@ -206,7 +206,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			Object value = parseValue();
 			skipWhitespace();
 			if (index != source.length()) {
-				throw error("Unexpected trailing JSON content"); //$NON-NLS-1$
+				throw error("Unexpected trailing JSON content");
 			}
 			return value;
 		}
@@ -214,7 +214,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 		private Object parseValue() {
 			skipWhitespace();
 			if (index >= source.length()) {
-				throw error("Unexpected end of JSON"); //$NON-NLS-1$
+				throw error("Unexpected end of JSON");
 			}
 			char c = source.charAt(index);
 			if (c == '{') {
@@ -227,15 +227,15 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				return parseString();
 			}
 			if (c == 't') {
-				expect("true"); //$NON-NLS-1$
+				expect("true");
 				return Boolean.TRUE;
 			}
 			if (c == 'f') {
-				expect("false"); //$NON-NLS-1$
+				expect("false");
 				return Boolean.FALSE;
 			}
 			if (c == 'n') {
-				expect("null"); //$NON-NLS-1$
+				expect("null");
 				return null;
 			}
 			return parseNumber();
@@ -252,7 +252,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			while (true) {
 				skipWhitespace();
 				if (!peek('"')) {
-					throw error("JSON object keys must be strings"); //$NON-NLS-1$
+					throw error("JSON object keys must be strings");
 				}
 				String key = parseString();
 				skipWhitespace();
@@ -297,17 +297,17 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				if (c == '\\') {
 					value.append(parseEscape());
 				} else if (c < 0x20) {
-					throw error("JSON strings must escape control characters"); //$NON-NLS-1$
+					throw error("JSON strings must escape control characters");
 				} else {
 					value.append(c);
 				}
 			}
-			throw error("Unterminated JSON string"); //$NON-NLS-1$
+			throw error("Unterminated JSON string");
 		}
 
 		private char parseEscape() {
 			if (index >= source.length()) {
-				throw error("Unterminated JSON escape"); //$NON-NLS-1$
+				throw error("Unterminated JSON escape");
 			}
 			char c = source.charAt(index++);
 			switch (c) {
@@ -321,21 +321,21 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			case 't': return '\t';
 			case 'u':
 				if (index + 4 > source.length()) {
-					throw error("Invalid JSON unicode escape"); //$NON-NLS-1$
+					throw error("Invalid JSON unicode escape");
 				}
 				int unicodeValue = 0;
 				for (int i = 0; i < 4; i++) {
 					char hexChar = source.charAt(index + i);
 					int digit = Character.digit(hexChar, 16);
 					if (digit < 0) {
-						throw error("Invalid JSON unicode escape"); //$NON-NLS-1$
+						throw error("Invalid JSON unicode escape");
 					}
 					unicodeValue = (unicodeValue << 4) | digit;
 				}
 				index += 4;
 				return (char) unicodeValue;
 			default:
-				throw error("Invalid JSON escape"); //$NON-NLS-1$
+				throw error("Invalid JSON escape");
 			}
 		}
 
@@ -357,31 +357,31 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				readDigits();
 			}
 			if (start == index) {
-				throw error("Expected JSON value"); //$NON-NLS-1$
+				throw error("Expected JSON value");
 			}
 			if (index < source.length() && !isJsonDelimiter(source.charAt(index))) {
-				throw error("Invalid JSON number"); //$NON-NLS-1$
+				throw error("Invalid JSON number");
 			}
 			try {
 				return new BigDecimal(source.subSequence(start, index).toString());
 			} catch (NumberFormatException e) {
-				throw error("Invalid JSON number"); //$NON-NLS-1$
+				throw error("Invalid JSON number");
 			}
 		}
 
 		private void readInteger() {
 			if (index >= source.length()) {
-				throw error("Expected JSON digit"); //$NON-NLS-1$
+				throw error("Expected JSON digit");
 			}
 			if (peek('0')) {
 				index++;
 				if (index < source.length() && Character.isDigit(source.charAt(index))) {
-					throw error("JSON numbers must not contain leading zeros"); //$NON-NLS-1$
+					throw error("JSON numbers must not contain leading zeros");
 				}
 				return;
 			}
 			if (source.charAt(index) < '1' || source.charAt(index) > '9') {
-				throw error("Expected JSON digit"); //$NON-NLS-1$
+				throw error("Expected JSON digit");
 			}
 			readDigits();
 		}
@@ -392,7 +392,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				index++;
 			}
 			if (start == index) {
-				throw error("Expected JSON digit"); //$NON-NLS-1$
+				throw error("Expected JSON digit");
 			}
 		}
 
@@ -418,14 +418,14 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 
 		private void expect(char c) {
 			if (!peek(c)) {
-				throw error("Expected '" + c + "'"); //$NON-NLS-1$ //$NON-NLS-2$
+				throw error("Expected '" + c + "'");
 			}
 			index++;
 		}
 
 		private void expect(String value) {
 			if (!startsWith(source, index, value)) {
-				throw error("Expected " + value); //$NON-NLS-1$
+				throw error("Expected " + value);
 			}
 			index += value.length();
 		}
@@ -443,7 +443,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 		}
 
 		private AppSettingsException error(String message) {
-			return new AppSettingsException(message + " at character " + index); //$NON-NLS-1$
+			return new AppSettingsException(message + " at character " + index);
 		}
 	}
 }

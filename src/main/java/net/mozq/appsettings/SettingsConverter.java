@@ -29,8 +29,8 @@ final class SettingsConverter {
 	private static final Map<Class<?>, Class<?>> PRIMITIVE_WRAPPERS = primitiveWrappers();
 
 	static <T> T convert(Object value, Class<T> type, TimeZone timeZone) {
-		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
-		ZoneId zoneId = Objects.requireNonNull(timeZone, "timeZone").toZoneId(); //$NON-NLS-1$
+		Objects.requireNonNull(type, "type");
+		ZoneId zoneId = Objects.requireNonNull(timeZone, "timeZone").toZoneId();
 		Class<?> wrapperType = wrapperType(type);
 		if (wrapperType.isInstance(value)) {
 			return castValue(value, type);
@@ -158,14 +158,14 @@ final class SettingsConverter {
 		if (type == Float.class) {
 			float converted = decimal.floatValue();
 			if (!Float.isFinite(converted)) {
-				throw new ArithmeticException("not a finite float"); //$NON-NLS-1$
+				throw new ArithmeticException("not a finite float");
 			}
 			return converted;
 		}
 		if (type == Double.class) {
 			double converted = decimal.doubleValue();
 			if (!Double.isFinite(converted)) {
-				throw new ArithmeticException("not a finite double"); //$NON-NLS-1$
+				throw new ArithmeticException("not a finite double");
 			}
 			return converted;
 		}
@@ -184,13 +184,13 @@ final class SettingsConverter {
 		}
 		if (number instanceof Float floatValue) {
 			if (!Float.isFinite(floatValue)) {
-				throw new NumberFormatException("not a finite float"); //$NON-NLS-1$
+				throw new NumberFormatException("not a finite float");
 			}
 			return BigDecimal.valueOf(floatValue.doubleValue());
 		}
 		if (number instanceof Double doubleValue) {
 			if (!Double.isFinite(doubleValue)) {
-				throw new NumberFormatException("not a finite double"); //$NON-NLS-1$
+				throw new NumberFormatException("not a finite double");
 			}
 			return BigDecimal.valueOf(doubleValue);
 		}
@@ -330,7 +330,7 @@ final class SettingsConverter {
 
 	private static Character parseCharacter(String value) {
 		if (value.length() != 1) {
-			throw new IllegalArgumentException("not a character: " + value); //$NON-NLS-1$
+			throw new IllegalArgumentException("not a character: " + value);
 		}
 		return value.charAt(0);
 	}
