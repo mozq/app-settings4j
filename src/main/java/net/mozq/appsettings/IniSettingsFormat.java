@@ -36,7 +36,7 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 			String rawKey = separator < 0 ? line.strip() : line.substring(0, separator).strip();
 			String key = SettingsValues.unescape(rawKey);
 			String rawValue = separator < 0 ? "" : line.substring(separator + 1);
-			SettingsValue value = separator < 0 ? SettingsValues.nullValue() : SettingsValues.inferEscaped(rawValue);
+			SettingsValue value = SettingsValues.inferEscaped(rawValue);
 			if (NODE_VALUE_KEY.equals(key)) {
 				if (section == null || section.isEmpty()) {
 					throw new AppSettingsException("@ is reserved for section values");

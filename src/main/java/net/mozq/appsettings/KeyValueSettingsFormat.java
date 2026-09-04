@@ -55,7 +55,7 @@ final class KeyValueSettingsFormat implements InternalSettingsFormat {
 		}
 		int separator = TextSettingsCodec.findSeparator(line);
 		if (separator < 0) {
-			values.put(SettingsValues.unescape(line.strip()), SettingsValues.nullValue());
+			values.put(SettingsValues.unescape(line.strip()), SettingsValues.string(""));
 		} else {
 			String rawValue = line.substring(separator + 1);
 			SettingsValue value = SettingsValues.inferEscaped(rawValue);

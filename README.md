@@ -186,6 +186,8 @@ If a value is missing or cannot be converted, the provided default value is retu
 
 Typed helpers use the same conversion rules. When string values are converted, the same type inference used while loading key-value, INI, YAML, and JSON files is applied first.
 
+Empty strings remain strings. When read as a number, boolean, date/time, or other incompatible type, they cannot be converted and the provided default value is returned.
+
 Compatible numeric types are converted through `BigDecimal`: integer targets reject fractional values and out-of-range values, and floating-point targets reject `NaN` and infinity.
 
 Date/time getters share one conversion rule. `Instant`, `Date`, `OffsetDateTime`, and `ZonedDateTime` can be converted as timeline values. `LocalDateTime`, `LocalDate`, and `LocalTime` can be converted from timeline values using the configured time zone. `LocalDateTime` and `LocalDate` can also be converted to timeline values using the configured time zone; `LocalTime` cannot because it has no date.
@@ -235,6 +237,9 @@ window.width=1024
 autosave.enabled=true
 opened.at=2026-08-29T12:34:56Z
 recent.tags=[work, archive, "hello, world"]
+empty=
+flag
+last.opened=null
 description=" Personal notes "
 ```
 
@@ -249,12 +254,15 @@ When loading key-value files:
 | `10`, `1.5` | `BigDecimal` |
 | ISO date/time text | date/time value |
 | `[a, b]` | list |
+| empty text | empty string |
 | `"10"` | string |
 
-A line without `=` is read as a null value:
+A line without `=` is read as an empty string. Use the `null` literal for null values. Empty strings cannot be converted to numbers, booleans, or date/time values by typed getters.
 
 ```properties
-last.opened
+empty=
+flag
+last.opened=null
 ```
 
 Quoted strings force string values and preserve characters that would otherwise be ambiguous:
@@ -267,7 +275,7 @@ date.label="2026-08-29"
 list.label="[one, two]"
 ```
 
-Strings are written as quoted strings when they are empty, look like another type, look like a quoted string, start or end with whitespace, or contain characters such as `"`, `\`, newlines, carriage returns, or tabs.
+Strings are written as quoted strings when they look like another type, look like a quoted string, start or end with whitespace, or contain characters such as `"`, `\`, newlines, carriage returns, or tabs. Empty strings are written as `key=`.
 
 List elements are separated by commas. List strings are also quoted when they contain `,`, `[`, or `]`:
 

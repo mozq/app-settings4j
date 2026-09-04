@@ -48,6 +48,9 @@ final class TextSettingsCodec {
 		if (value instanceof SettingsValue.ListValue listValue) {
 			return SettingsValues.formatList(listValue.values(), nullable);
 		}
+		if (value instanceof SettingsValue.StringValue stringValue && stringValue.raw().isEmpty()) {
+			return "";
+		}
 		if (SettingsValues.shouldQuoteString(value)) {
 			return SettingsValues.quote(SettingsValues.raw(value));
 		}

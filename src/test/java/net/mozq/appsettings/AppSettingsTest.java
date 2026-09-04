@@ -438,7 +438,8 @@ class AppSettingsTest {
 					.set("boolean", "yes")
 					.set("instant", "2026-08-29 12:34:56")
 					.set("timeZone", "not-a-zone")
-					.set("tags", List.of("work", "10"));
+					.set("tags", List.of("work", "10"))
+					.set("empty", "");
 
 			assertEquals(7, settings.getInt("integer", 7));
 			assertFalse(settings.getBoolean("boolean", false));
@@ -446,6 +447,12 @@ class AppSettingsTest {
 			assertEquals(TimeZone.getTimeZone("UTC"), settings.getTimeZone("timeZone", TimeZone.getTimeZone("UTC")));
 			assertEquals("fallback", settings.getString("missing", "fallback"));
 			assertEquals(List.of(1, 2), settings.getList("tags", Integer.class, List.of(1, 2)));
+			assertEquals("", settings.getString("empty", "fallback"));
+			assertEquals(7, settings.getInt("empty", 7));
+			assertEquals(BigDecimal.ONE, settings.getBigDecimal("empty", BigDecimal.ONE));
+			assertTrue(settings.getBoolean("empty", true));
+			assertEquals(Instant.EPOCH, settings.getInstant("empty", Instant.EPOCH));
+			assertEquals('x', settings.getChar("empty", 'x'));
 		}
 
 		@Test
@@ -536,7 +543,9 @@ class AppSettingsTest {
 					"enabled=true",
 					"created=2026-08-29T12:34:56Z",
 					"tags=[work, \"hello, world\", \"[draft]\", \" leading \", 3]",
-					"last.opened",
+					"empty.value=",
+					"empty.flag",
+					"last.opened=null",
 					"label=\"null\"",
 					"date.label=\"2026-08-29\"",
 					"list.label=\"[one, two]\""));
@@ -550,6 +559,8 @@ class AppSettingsTest {
 			assertEquals(true, loaded.get("enabled"));
 			assertInstanceOf(TemporalAccessor.class, loaded.get("created"));
 			assertEquals(List.of("work", "hello, world", "[draft]", " leading ", new BigDecimal("3")), loaded.getList("tags", List.of()));
+			assertEquals("", loaded.getString("empty.value", "fallback"));
+			assertEquals("", loaded.getString("empty.flag", "fallback"));
 			assertFalse(loaded.contains("last.opened"));
 			assertEquals("null", loaded.getString("label", ""));
 			assertEquals("2026-08-29", loaded.getString("date.label", ""));
@@ -574,7 +585,7 @@ class AppSettingsTest {
 
 			List<String> lines = Files.readAllLines(file);
 
-			assertTrue(lines.contains("empty=\"\""));
+			assertTrue(lines.contains("empty="));
 			assertTrue(lines.contains("reserved=\"true\""));
 			assertTrue(lines.contains("number.text=\"1.0\""));
 			assertTrue(lines.contains("date.text=\"2026-08-29\""));
@@ -607,6 +618,7 @@ class AppSettingsTest {
 
 			settings("acme", "notes", "settings.ini")
 					.set("theme", "dark")
+					.set("empty", "")
 					.set("editor", "enabled")
 					.set("editor.wrap", true)
 					.set("editor.font.size", 14)
@@ -617,13 +629,15 @@ class AppSettingsTest {
 
 			assertTrue(content.startsWith("; INI settings"));
 			assertTrue(content.contains("theme=dark"));
+			assertTrue(content.contains("empty="));
 			assertTrue(content.contains("[editor]"));
 			assertTrue(content.contains("@=enabled"));
 			assertTrue(content.contains("wrap=true"));
 			assertTrue(content.contains("[editor.font]"));
 			assertTrue(content.contains("size=14"));
-			assertEquals(List.of("theme", "editor", "editor.wrap", "editor.font.size"), List.copyOf(loaded.keySet()));
+			assertEquals(List.of("theme", "empty", "editor", "editor.wrap", "editor.font.size"), List.copyOf(loaded.keySet()));
 			assertEquals("enabled", loaded.getString("editor", ""));
+			assertEquals("", loaded.getString("empty", "fallback"));
 			assertTrue(loaded.getBoolean("editor.wrap", false));
 			assertEquals(14, loaded.getInt("editor.font.size", 0));
 		}
@@ -636,6 +650,9 @@ class AppSettingsTest {
 					"count=10",
 					"enabled=true",
 					"tags=[work, \"hello, world\", 3]",
+					"empty.value=",
+					"empty.flag",
+					"last.opened=null",
 					"literal=\"null\""));
 
 			AppSettings loaded = settings("acme", "notes", "settings.ini").loadFrom(file);
@@ -644,6 +661,9 @@ class AppSettingsTest {
 			assertEquals(new BigDecimal("10"), loaded.get("count"));
 			assertEquals(true, loaded.get("enabled"));
 			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("tags", List.of()));
+			assertEquals("", loaded.getString("empty.value", "fallback"));
+			assertEquals("", loaded.getString("empty.flag", "fallback"));
+			assertFalse(loaded.contains("last.opened"));
 			assertEquals("null", loaded.get("literal"));
 		}
 
