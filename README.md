@@ -24,7 +24,6 @@ dependencies {
 
 ```java
 import java.util.List;
-import java.util.Set;
 
 import net.mozq.appsettings.AppSettings;
 
@@ -96,6 +95,20 @@ All built-in formats use UTF-8. Keys keep their insertion order: updating an exi
 
 Saving writes through a temporary file and replace operation when possible. If a temporary file cannot be created, it falls back to direct saving.
 
+## Core API
+
+| Method | Purpose |
+| --- | --- |
+| `load()` / `store()` | Read and write the configured settings file |
+| `set(key, value)` | Store a typed value |
+| `getString(key, defaultValue)` and typed getters | Read values with conversion |
+| `get(key)` / `get(key, defaultValue)` | Read inferred Java values without conversion |
+| `contains(key)` | Check whether a visible key exists |
+| `keySet()` | Return visible keys in insertion order |
+| `size()` / `isEmpty()` | Count visible keys |
+| `remove(key)` / `clear()` | Delete one key or all keys |
+| `asStringMap()` / `asMap()` | Export visible settings as maps |
+
 ## Values
 
 Use `set(String key, Object value)` to store values.
@@ -117,7 +130,6 @@ Read values as strings:
 
 ```java
 String theme = settings.getString("theme", "light");
-Map<String, String> strings = settings.asStringMap();
 ```
 
 Read inferred Java values without conversion:
@@ -125,10 +137,16 @@ Read inferred Java values without conversion:
 ```java
 Object value = settings.get("window.width");
 Object fallback = settings.get("missing.key", "fallback");
+Map<String, Object> values = settings.asMap();
+```
+
+Inspect visible keys and maps:
+
+```java
 Set<String> keys = settings.keySet();
 int count = settings.size();
 boolean empty = settings.isEmpty();
-Map<String, Object> values = settings.asMap();
+Map<String, String> strings = settings.asStringMap();
 ```
 
 `get(key)` and `get(key, defaultValue)` return `Object` because no target type is specified. They expose the inferred Java value as-is:
@@ -142,7 +160,7 @@ Map<String, Object> values = settings.asMap();
 | list | `List<Object>` |
 | null | `null` |
 
-`keySet()` returns visible keys in insertion order. `size()` and `isEmpty()` use the same visible-key rules. Null values are excluded unless `nullable(true)` is enabled. `asMap()` returns values using the same type rules as `get(key)`.
+`contains()`, `keySet()`, `size()`, and `isEmpty()` use the same visible-key rules. Null values are excluded unless `nullable(true)` is enabled. `asMap()` returns values using the same type rules as `get(key)`.
 
 For common types, use the typed helpers:
 
@@ -359,7 +377,9 @@ Implement `SettingsFormat` to plug in another storage format:
 SettingsFormat format = new SettingsFormat() {
     @Override
     public Map<String, Object> read(Reader reader) throws IOException {
-        return Map.of("theme", "dark");
+        Map<String, Object> values = new LinkedHashMap<>();
+        values.put("theme", "dark");
+        return values;
     }
 
     @Override
@@ -375,7 +395,7 @@ AppSettings settings = AppSettings
         .load();
 ```
 
-Custom formats receive and return ordinary Java values. Built-in formats keep additional internal type information so they can preserve null handling and ordered typed values consistently.
+Custom formats read and write ordinary Java values. `write()` receives the same visible inferred values as `asMap()`. Built-in formats keep additional internal type information so they can preserve null handling and ordered typed values consistently.
 
 ## Notes
 

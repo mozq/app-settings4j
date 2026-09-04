@@ -310,10 +310,19 @@ public final class AppSettings {
 		return getAs(key, URI.class, defaultValue);
 	}
 
+	/**
+	 * Returns a list of inferred Java values. Null elements are included only
+	 * when nullable mode is enabled.
+	 */
 	public List<Object> getList(String key) {
 		return getList(key, List.of());
 	}
 
+	/**
+	 * Returns a list of inferred Java values, or the default list when the key
+	 * does not contain a visible list value. Null elements are included only
+	 * when nullable mode is enabled.
+	 */
 	public List<Object> getList(String key, List<?> defaultValue) {
 		lock.readLock().lock();
 		try {
@@ -336,10 +345,19 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns a list converted to the requested element type. If any element
+	 * cannot be converted, the default empty list is returned.
+	 */
 	public <T> List<T> getList(String key, Class<T> elementType) {
 		return getList(key, elementType, List.of());
 	}
 
+	/**
+	 * Returns a list converted to the requested element type, or the default
+	 * list when the key is missing, not a visible list, or contains an element
+	 * that cannot be converted.
+	 */
 	public <T> List<T> getList(String key, Class<T> elementType, List<T> defaultValue) {
 		Objects.requireNonNull(elementType, "elementType");
 		lock.readLock().lock();
@@ -444,6 +462,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns whether the key has a visible value. Null values are visible only
+	 * when nullable mode is enabled.
+	 */
 	public boolean contains(String key) {
 		requireKey(key);
 		lock.readLock().lock();
@@ -454,6 +476,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns the number of visible keys. Null values are counted only when
+	 * nullable mode is enabled.
+	 */
 	public int size() {
 		lock.readLock().lock();
 		try {
@@ -469,6 +495,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns whether there are no visible keys. Null values are visible only
+	 * when nullable mode is enabled.
+	 */
 	public boolean isEmpty() {
 		lock.readLock().lock();
 		try {
@@ -483,6 +513,9 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Deletes one key from the settings.
+	 */
 	public AppSettings remove(String key) {
 		requireKey(key);
 		lock.writeLock().lock();
@@ -494,6 +527,9 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Deletes all keys from the settings.
+	 */
 	public AppSettings clear() {
 		lock.writeLock().lock();
 		try {
@@ -504,6 +540,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Sets whether null values are visible to reads, key lookup, map exports,
+	 * and saving. Null values are kept internally in both modes.
+	 */
 	public AppSettings nullable(boolean nullable) {
 		lock.writeLock().lock();
 		try {
@@ -514,6 +554,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Sets the time zone used when converting between local date/time values
+	 * and timeline values such as {@link Instant} and {@link Date}.
+	 */
 	public AppSettings timeZone(TimeZone timeZone) {
 		Objects.requireNonNull(timeZone, "timeZone");
 		lock.writeLock().lock();
@@ -525,6 +569,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Sets the file format explicitly, overriding the default format selected
+	 * from the configured file name.
+	 */
 	public AppSettings format(SettingsFormat format) {
 		Objects.requireNonNull(format, "format");
 		lock.writeLock().lock();
@@ -536,6 +584,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns visible keys in insertion order. Null values are included only
+	 * when nullable mode is enabled.
+	 */
 	public Set<String> keySet() {
 		lock.readLock().lock();
 		try {
@@ -551,6 +603,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns visible keys and their raw string values in insertion order. Null
+	 * values are included only when nullable mode is enabled.
+	 */
 	public Map<String, String> asStringMap() {
 		lock.readLock().lock();
 		try {
@@ -566,6 +622,10 @@ public final class AppSettings {
 		}
 	}
 
+	/**
+	 * Returns visible keys and their inferred Java values in insertion order.
+	 * Null values are included only when nullable mode is enabled.
+	 */
 	public Map<String, Object> asMap() {
 		lock.readLock().lock();
 		try {
