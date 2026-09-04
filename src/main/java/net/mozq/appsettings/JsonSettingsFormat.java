@@ -8,7 +8,6 @@ package net.mozq.appsettings;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.StringWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.util.ArrayList;
@@ -21,9 +20,13 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
-		StringWriter content = new StringWriter();
-		reader.transferTo(content);
-		Object root = new Parser(content.toString()).parse();
+		StringBuilder content = new StringBuilder(2048);
+		char[] buffer = new char[4096];
+		int numRead;
+		while ((numRead = reader.read(buffer)) != -1) {
+			content.append(buffer, 0, numRead);
+		}
+		Object root = new Parser(content).parse();
 		if (!(root instanceof Map<?, ?> map)) {
 			throw new AppSettingsException("JSON settings must be an object"); //$NON-NLS-1$
 		}
@@ -74,7 +77,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			return SettingsValues.bool(bool);
 		}
 		if (value instanceof List<?> list) {
-			List<SettingsValue> values = new ArrayList<>();
+			List<SettingsValue> values = new ArrayList<>(list.size());
 			for (Object item : list) {
 				values.add(toSettingsValue(item));
 			}
@@ -164,7 +167,8 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static String quote(String value) {
-		StringBuilder quoted = new StringBuilder("\""); //$NON-NLS-1$
+		StringBuilder quoted = new StringBuilder(value.length() + 8);
+		quoted.append('"');
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			switch (c) {
@@ -191,10 +195,10 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static final class Parser {
-		private final String source;
+		private final CharSequence source;
 		private int index;
 
-		Parser(String source) {
+		Parser(CharSequence source) {
 			this.source = source;
 		}
 
@@ -319,12 +323,17 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				if (index + 4 > source.length()) {
 					throw error("Invalid JSON unicode escape"); //$NON-NLS-1$
 				}
-				String hex = source.substring(index, index + 4);
-				if (!hex.chars().allMatch(JsonSettingsFormat.Parser::isHexDigit)) {
-					throw error("Invalid JSON unicode escape"); //$NON-NLS-1$
+				int unicodeValue = 0;
+				for (int i = 0; i < 4; i++) {
+					char hexChar = source.charAt(index + i);
+					int digit = Character.digit(hexChar, 16);
+					if (digit < 0) {
+						throw error("Invalid JSON unicode escape"); //$NON-NLS-1$
+					}
+					unicodeValue = (unicodeValue << 4) | digit;
 				}
 				index += 4;
-				return (char) Integer.parseInt(hex, 16);
+				return (char) unicodeValue;
 			default:
 				throw error("Invalid JSON escape"); //$NON-NLS-1$
 			}
@@ -354,7 +363,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 				throw error("Invalid JSON number"); //$NON-NLS-1$
 			}
 			try {
-				return new BigDecimal(source.substring(start, index));
+				return new BigDecimal(source.subSequence(start, index).toString());
 			} catch (NumberFormatException e) {
 				throw error("Invalid JSON number"); //$NON-NLS-1$
 			}
@@ -415,10 +424,22 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 		}
 
 		private void expect(String value) {
-			if (!source.startsWith(value, index)) {
+			if (!startsWith(source, index, value)) {
 				throw error("Expected " + value); //$NON-NLS-1$
 			}
 			index += value.length();
+		}
+
+		private static boolean startsWith(CharSequence cs, int offset, String prefix) {
+			if (offset < 0 || offset + prefix.length() > cs.length()) {
+				return false;
+			}
+			for (int i = 0; i < prefix.length(); i++) {
+				if (cs.charAt(offset + i) != prefix.charAt(i)) {
+					return false;
+				}
+			}
+			return true;
 		}
 
 		private AppSettingsException error(String message) {

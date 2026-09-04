@@ -147,7 +147,8 @@ final class SettingsValues {
 	}
 
 	static String formatList(List<SettingsValue> values, boolean nullable) {
-		StringBuilder builder = new StringBuilder("["); //$NON-NLS-1$
+		StringBuilder builder = new StringBuilder(Math.max(16, values.size() * 16));
+		builder.append('[');
 		boolean wrote = false;
 		for (SettingsValue value : values) {
 			if (value instanceof SettingsValue.NullValue && !nullable) {
@@ -174,7 +175,7 @@ final class SettingsValues {
 	}
 
 	static String unescape(String value) {
-		StringBuilder unescaped = new StringBuilder();
+		StringBuilder unescaped = new StringBuilder(value.length());
 		boolean escaped = false;
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
@@ -213,7 +214,8 @@ final class SettingsValues {
 	}
 
 	static String quote(String value) {
-		StringBuilder quoted = new StringBuilder("\""); //$NON-NLS-1$
+		StringBuilder quoted = new StringBuilder(value.length() + 8);
+		quoted.append('"');
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			switch (c) {
@@ -232,7 +234,7 @@ final class SettingsValues {
 		if (!isQuoted(value)) {
 			return value;
 		}
-		StringBuilder result = new StringBuilder();
+		StringBuilder result = new StringBuilder(Math.max(0, value.length() - 2));
 		boolean escaped = false;
 		for (int i = 1; i < value.length() - 1; i++) {
 			char c = value.charAt(i);

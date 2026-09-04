@@ -8,6 +8,7 @@ package net.mozq.appsettings;
 
 import java.util.LinkedHashMap;
 import java.util.Map;
+import java.util.regex.Pattern;
 
 final class SettingsNode {
 	private SettingsValue value;
@@ -48,8 +49,10 @@ final class SettingsNode {
 		return root;
 	}
 
+	private static final Pattern DOT_PATTERN = Pattern.compile("\\."); //$NON-NLS-1$
+
 	private void put(String key, SettingsValue value) {
-		String[] parts = key.split("\\.", -1); //$NON-NLS-1$
+		String[] parts = DOT_PATTERN.split(key, -1);
 		SettingsNode node = this;
 		for (String part : parts) {
 			if (part.isEmpty()) {

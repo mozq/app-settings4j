@@ -55,14 +55,18 @@ final class SettingsValueParser {
 		if (isFalseLiteral(normalized)) {
 			return new SettingsValue.BooleanValue(raw, false);
 		}
-		try {
-			return new SettingsValue.NumberValue(raw, new BigDecimal(normalized));
-		} catch (NumberFormatException e) {
-			// Try date/time formats next.
+		if (isNumberCandidate(normalized)) {
+			try {
+				return new SettingsValue.NumberValue(raw, new BigDecimal(normalized));
+			} catch (NumberFormatException e) {
+				// Try date/time formats next.
+			}
 		}
-		TemporalAccessor dateTime = parseDateTime(normalized);
-		if (dateTime != null) {
-			return new SettingsValue.DateTimeValue(raw, dateTime);
+		if (isDateTimeCandidate(normalized)) {
+			TemporalAccessor dateTime = parseDateTime(normalized);
+			if (dateTime != null) {
+				return new SettingsValue.DateTimeValue(raw, dateTime);
+			}
 		}
 		return new SettingsValue.StringValue(raw, raw);
 	}
@@ -143,6 +147,25 @@ final class SettingsValueParser {
 
 	private static boolean isFalseLiteral(String normalized) {
 		return "false".equals(normalized); //$NON-NLS-1$
+	}
+
+	private static boolean isNumberCandidate(String s) {
+		if (s == null || s.isEmpty()) {
+			return false;
+		}
+		char first = s.charAt(0);
+		return (first >= '0' && first <= '9') || first == '+' || first == '-' || first == '.';
+	}
+
+	private static boolean isDateTimeCandidate(String s) {
+		if (s == null || s.length() < 4) {
+			return false;
+		}
+		char first = s.charAt(0);
+		if (first < '0' || first > '9') {
+			return false;
+		}
+		return s.indexOf('-') >= 0 || s.indexOf(':') >= 0;
 	}
 
 	private static TemporalAccessor parseDateTime(String value) {

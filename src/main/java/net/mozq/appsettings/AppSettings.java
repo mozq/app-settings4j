@@ -293,6 +293,9 @@ public final class AppSettings {
 					.map(item -> SettingsValues.object(item, nullable))
 					.toList();
 		}
+		if (defaultValue.isEmpty()) {
+			return List.of();
+		}
 		return Collections.unmodifiableList(new ArrayList<>(defaultValue));
 	}
 
@@ -305,7 +308,7 @@ public final class AppSettings {
 		if (!(value instanceof SettingsValue.ListValue listValue)) {
 			return defaultValue;
 		}
-		List<T> converted = new ArrayList<>();
+		List<T> converted = new ArrayList<>(listValue.values().size());
 		for (SettingsValue item : listValue.values()) {
 			if (item instanceof SettingsValue.NullValue && !nullable) {
 				continue;
@@ -320,6 +323,9 @@ public final class AppSettings {
 				return defaultValue;
 			}
 			converted.add(convertedItem);
+		}
+		if (converted.isEmpty()) {
+			return List.of();
 		}
 		return Collections.unmodifiableList(converted);
 	}

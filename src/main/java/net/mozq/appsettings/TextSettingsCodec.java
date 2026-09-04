@@ -56,7 +56,7 @@ final class TextSettingsCodec {
 	}
 
 	private static String escape(String value, boolean key, boolean keyValueStyle) {
-		StringBuilder escaped = new StringBuilder();
+		StringBuilder escaped = new StringBuilder(value.length() + 16);
 		for (int i = 0; i < value.length(); i++) {
 			char c = value.charAt(i);
 			if (shouldEscape(value, c, i, key, keyValueStyle)) {

@@ -28,41 +28,35 @@ import java.util.TimeZone;
 final class SettingsConverter {
 	private static final Map<Class<?>, Class<?>> PRIMITIVE_WRAPPERS = primitiveWrappers();
 
-	private final ZoneId zoneId;
-
 	static <T> T convert(Object value, Class<T> type, TimeZone timeZone) {
-		return new SettingsConverter(timeZone).convert(value, type);
-	}
-
-	private SettingsConverter(TimeZone timeZone) {
-		this.zoneId = Objects.requireNonNull(timeZone, "timeZone").toZoneId(); //$NON-NLS-1$
-	}
-
-	private <T> T convert(Object value, Class<T> type) {
 		Objects.requireNonNull(type, "type"); //$NON-NLS-1$
+		ZoneId zoneId = Objects.requireNonNull(timeZone, "timeZone").toZoneId(); //$NON-NLS-1$
 		Class<?> wrapperType = wrapperType(type);
 		if (wrapperType.isInstance(value)) {
 			return castValue(value, type);
 		}
 		try {
-			Object converted = convertObject(value, wrapperType);
+			Object converted = convertObject(value, wrapperType, zoneId);
 			return castValue(converted, type);
 		} catch (RuntimeException e) {
 			return null;
 		}
 	}
 
-	private Object convertObject(Object value, Class<?> type) {
+	private SettingsConverter() {
+	}
+
+	private static Object convertObject(Object value, Class<?> type, ZoneId zoneId) {
 		if (type == String.class) {
 			return value.toString();
 		}
 		if (value instanceof String string) {
-			return convertString(string, type);
+			return convertString(string, type, zoneId);
 		}
 		if (isNumericType(type) && value instanceof Number number) {
 			return convertNumber(number, type);
 		}
-		Object dateTime = convertDateTime(value, type);
+		Object dateTime = convertDateTime(value, type, zoneId);
 		if (dateTime != null) {
 			return dateTime;
 		}
@@ -90,7 +84,7 @@ final class SettingsConverter {
 		return convertEnum(value.toString(), type);
 	}
 
-	private Object convertString(String value, Class<?> type) {
+	private static Object convertString(String value, Class<?> type, ZoneId zoneId) {
 		SettingsValue inferred = SettingsValues.infer(value);
 		Object inferredObject = SettingsValues.object(inferred);
 		if (inferredObject == null) {
@@ -102,7 +96,7 @@ final class SettingsConverter {
 		if (isNumericType(type) && inferredObject instanceof Number number) {
 			return convertNumber(number, type);
 		}
-		Object dateTime = convertDateTime(inferredObject, type);
+		Object dateTime = convertDateTime(inferredObject, type, zoneId);
 		if (dateTime != null) {
 			return dateTime;
 		}
@@ -203,33 +197,33 @@ final class SettingsConverter {
 		return new BigDecimal(number.toString());
 	}
 
-	private Object convertDateTime(Object value, Class<?> type) {
+	private static Object convertDateTime(Object value, Class<?> type, ZoneId zoneId) {
 		if (type == Instant.class) {
-			return toInstant(value);
+			return toInstant(value, zoneId);
 		}
 		if (type == Date.class) {
-			Instant instant = toInstant(value);
+			Instant instant = toInstant(value, zoneId);
 			return instant == null ? null : Date.from(instant);
 		}
 		if (type == LocalDateTime.class) {
-			return toLocalDateTime(value);
+			return toLocalDateTime(value, zoneId);
 		}
 		if (type == LocalDate.class) {
-			return toLocalDate(value);
+			return toLocalDate(value, zoneId);
 		}
 		if (type == LocalTime.class) {
-			return toLocalTime(value);
+			return toLocalTime(value, zoneId);
 		}
 		if (type == OffsetDateTime.class) {
-			return toOffsetDateTime(value);
+			return toOffsetDateTime(value, zoneId);
 		}
 		if (type == ZonedDateTime.class) {
-			return toZonedDateTime(value);
+			return toZonedDateTime(value, zoneId);
 		}
 		return null;
 	}
 
-	private Instant toInstant(Object value) {
+	private static Instant toInstant(Object value, ZoneId zoneId) {
 		if (value instanceof Instant instant) {
 			return instant;
 		}
@@ -251,51 +245,51 @@ final class SettingsConverter {
 		return null;
 	}
 
-	private LocalDateTime toLocalDateTime(Object value) {
+	private static LocalDateTime toLocalDateTime(Object value, ZoneId zoneId) {
 		if (value instanceof LocalDateTime localDateTime) {
 			return localDateTime;
 		}
 		if (value instanceof LocalDate localDate) {
 			return localDate.atStartOfDay();
 		}
-		Instant instant = toInstant(value);
+		Instant instant = toInstant(value, zoneId);
 		return instant == null ? null : LocalDateTime.ofInstant(instant, zoneId);
 	}
 
-	private LocalDate toLocalDate(Object value) {
+	private static LocalDate toLocalDate(Object value, ZoneId zoneId) {
 		if (value instanceof LocalDate localDate) {
 			return localDate;
 		}
 		if (value instanceof LocalDateTime localDateTime) {
 			return localDateTime.toLocalDate();
 		}
-		Instant instant = toInstant(value);
+		Instant instant = toInstant(value, zoneId);
 		return instant == null ? null : instant.atZone(zoneId).toLocalDate();
 	}
 
-	private LocalTime toLocalTime(Object value) {
+	private static LocalTime toLocalTime(Object value, ZoneId zoneId) {
 		if (value instanceof LocalTime localTime) {
 			return localTime;
 		}
 		if (value instanceof LocalDateTime localDateTime) {
 			return localDateTime.toLocalTime();
 		}
-		Instant instant = toInstant(value);
+		Instant instant = toInstant(value, zoneId);
 		return instant == null ? null : instant.atZone(zoneId).toLocalTime();
 	}
 
-	private OffsetDateTime toOffsetDateTime(Object value) {
+	private static OffsetDateTime toOffsetDateTime(Object value, ZoneId zoneId) {
 		if (value instanceof OffsetDateTime offsetDateTime) {
 			return offsetDateTime;
 		}
 		if (value instanceof ZonedDateTime zonedDateTime) {
 			return zonedDateTime.withZoneSameInstant(zoneId).toOffsetDateTime();
 		}
-		ZonedDateTime zonedDateTime = toZonedDateTime(value);
+		ZonedDateTime zonedDateTime = toZonedDateTime(value, zoneId);
 		return zonedDateTime == null ? null : zonedDateTime.toOffsetDateTime();
 	}
 
-	private ZonedDateTime toZonedDateTime(Object value) {
+	private static ZonedDateTime toZonedDateTime(Object value, ZoneId zoneId) {
 		if (value instanceof ZonedDateTime zonedDateTime) {
 			return zonedDateTime;
 		}
@@ -308,7 +302,7 @@ final class SettingsConverter {
 		if (value instanceof LocalDate localDate) {
 			return localDate.atStartOfDay(zoneId);
 		}
-		Instant instant = toInstant(value);
+		Instant instant = toInstant(value, zoneId);
 		return instant == null ? null : instant.atZone(zoneId);
 	}
 
