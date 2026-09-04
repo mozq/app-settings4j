@@ -30,13 +30,14 @@ import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
 import java.time.temporal.TemporalAccessor;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.TimeZone;
-import java.util.ArrayList;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
@@ -146,7 +147,7 @@ class AppSettingsTest {
 
 			AppSettings loaded = settings("acme", "notes", "settings.properties").loadFrom(file);
 
-			assertEquals(List.of("theme", "window.width"), List.copyOf(loaded.asStringMap().keySet()));
+			assertEquals(List.of("theme", "window.width"), List.copyOf(loaded.keySet()));
 			assertEquals("dark", loaded.getString("theme", ""));
 			assertEquals(1024, loaded.getInt("window.width", 0));
 			assertEquals("# Application settings", Files.readAllLines(file).getFirst());
@@ -163,12 +164,48 @@ class AppSettingsTest {
 		}
 
 		@Test
+		void rejectsInvalidKeysForLookupAndRemoval() {
+			AppSettings settings = settings("acme", "notes", "settings.properties");
+
+			assertThrows(IllegalArgumentException.class, () -> settings.contains(null));
+			assertThrows(IllegalArgumentException.class, () -> settings.contains(""));
+			assertThrows(IllegalArgumentException.class, () -> settings.remove(null));
+			assertThrows(IllegalArgumentException.class, () -> settings.remove(""));
+		}
+
+		@Test
+		void countsVisibleKeysAndClearsSettings() {
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.set("theme", "dark")
+					.set("window.width", 1024)
+					.set("last.opened", null);
+
+			assertEquals(2, settings.size());
+			assertFalse(settings.isEmpty());
+			assertEquals(List.of("theme", "window.width"), List.copyOf(settings.keySet()));
+
+			settings.nullable(true);
+
+			assertEquals(3, settings.size());
+			assertEquals(List.of("theme", "window.width", "last.opened"), List.copyOf(settings.keySet()));
+
+			settings.clear();
+
+			assertEquals(0, settings.size());
+			assertTrue(settings.isEmpty());
+			assertTrue(settings.keySet().isEmpty());
+		}
+
+		@Test
 		void returnsUnmodifiableMapsAndDefaultLists() {
 			AppSettings settings = settings("acme", "notes", "settings.properties");
 
 			Map<String, String> strings = settings.set("theme", "dark").asStringMap();
+			Set<String> keys = settings.set("window.width", 1024).keySet();
 			List<Object> defaultList = settings.getList("missing", Arrays.asList("one", null));
 
+			assertEquals(List.of("theme", "window.width"), List.copyOf(keys));
+			assertThrows(UnsupportedOperationException.class, () -> keys.add("other"));
 			assertEquals(null, settings.getList("missing", (List<?>)null));
 			assertThrows(UnsupportedOperationException.class, () -> strings.put("other", "value"));
 			assertThrows(UnsupportedOperationException.class, () -> defaultList.add("two"));
@@ -443,6 +480,7 @@ class AppSettingsTest {
 			AppSettings loaded = settings(null, "notes", "settings.properties").loadFrom(file);
 
 			assertFalse(loaded.contains("last.opened"));
+			assertFalse(loaded.keySet().contains("last.opened"));
 			assertEquals("fallback", loaded.getString("last.opened", "fallback"));
 			assertEquals(List.of("work", "archive"), loaded.getList("recent.tags", String.class, List.of()));
 			assertFalse(Files.readString(file).contains("null"));
@@ -463,6 +501,7 @@ class AppSettingsTest {
 					.loadFrom(file);
 
 			assertTrue(loaded.contains("last.opened"));
+			assertTrue(loaded.keySet().contains("last.opened"));
 			assertEquals(null, loaded.get("last.opened", "fallback"));
 			assertEquals(null, loaded.getString("last.opened", "fallback"));
 			assertEquals(Arrays.asList("work", null, "archive"), loaded.getList("recent.tags", String.class, List.of()));
@@ -583,7 +622,7 @@ class AppSettingsTest {
 			assertTrue(content.contains("wrap=true"));
 			assertTrue(content.contains("[editor.font]"));
 			assertTrue(content.contains("size=14"));
-			assertEquals(List.of("theme", "editor", "editor.wrap", "editor.font.size"), List.copyOf(loaded.asStringMap().keySet()));
+			assertEquals(List.of("theme", "editor", "editor.wrap", "editor.font.size"), List.copyOf(loaded.keySet()));
 			assertEquals("enabled", loaded.getString("editor", ""));
 			assertTrue(loaded.getBoolean("editor.wrap", false));
 			assertEquals(14, loaded.getInt("editor.font.size", 0));

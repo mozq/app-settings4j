@@ -24,6 +24,7 @@ dependencies {
 
 ```java
 import java.util.List;
+import java.util.Set;
 
 import net.mozq.appsettings.AppSettings;
 
@@ -124,6 +125,9 @@ Read inferred Java values without conversion:
 ```java
 Object value = settings.get("window.width");
 Object fallback = settings.get("missing.key", "fallback");
+Set<String> keys = settings.keySet();
+int count = settings.size();
+boolean empty = settings.isEmpty();
 Map<String, Object> values = settings.asMap();
 ```
 
@@ -138,7 +142,7 @@ Map<String, Object> values = settings.asMap();
 | list | `List<Object>` |
 | null | `null` |
 
-`asMap()` returns values using the same type rules as `get(key)`.
+`keySet()` returns visible keys in insertion order. `size()` and `isEmpty()` use the same visible-key rules. Null values are excluded unless `nullable(true)` is enabled. `asMap()` returns values using the same type rules as `get(key)`.
 
 For common types, use the typed helpers:
 
@@ -201,7 +205,7 @@ settings.contains("last.opened");              // true
 settings.getString("last.opened", "fallback"); // null
 ```
 
-Use `remove(key)` to delete a key.
+Use `remove(key)` to delete one key, or `clear()` to remove all keys.
 
 ## Key-Value Files
 

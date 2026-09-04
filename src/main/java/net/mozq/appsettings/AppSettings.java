@@ -26,10 +26,12 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Date;
 import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
@@ -443,6 +445,7 @@ public final class AppSettings {
 	}
 
 	public boolean contains(String key) {
+		requireKey(key);
 		lock.readLock().lock();
 		try {
 			return visibleValue(key) != null;
@@ -451,10 +454,50 @@ public final class AppSettings {
 		}
 	}
 
+	public int size() {
+		lock.readLock().lock();
+		try {
+			int size = 0;
+			for (SettingsValue value : values.values()) {
+				if (isVisible(value)) {
+					size++;
+				}
+			}
+			return size;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
+	public boolean isEmpty() {
+		lock.readLock().lock();
+		try {
+			for (SettingsValue value : values.values()) {
+				if (isVisible(value)) {
+					return false;
+				}
+			}
+			return true;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
 	public AppSettings remove(String key) {
+		requireKey(key);
 		lock.writeLock().lock();
 		try {
 			values.remove(key);
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
+	}
+
+	public AppSettings clear() {
+		lock.writeLock().lock();
+		try {
+			values.clear();
 			return this;
 		} finally {
 			lock.writeLock().unlock();
@@ -490,6 +533,21 @@ public final class AppSettings {
 			return this;
 		} finally {
 			lock.writeLock().unlock();
+		}
+	}
+
+	public Set<String> keySet() {
+		lock.readLock().lock();
+		try {
+			LinkedHashSet<String> keys = new LinkedHashSet<>();
+			for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
+				if (isVisible(entry.getValue())) {
+					keys.add(entry.getKey());
+				}
+			}
+			return Collections.unmodifiableSet(keys);
+		} finally {
+			lock.readLock().unlock();
 		}
 	}
 
