@@ -123,10 +123,11 @@ Read inferred Java values without conversion:
 
 ```java
 Object value = settings.get("window.width");
+Object fallback = settings.get("missing.key", "fallback");
 Map<String, Object> values = settings.asMap();
 ```
 
-`get(key)` returns `Object` because no target type is specified. It exposes the inferred Java value as-is:
+`get(key)` and `get(key, defaultValue)` return `Object` because no target type is specified. They expose the inferred Java value as-is:
 
 | Stored value | Returned type |
 | --- | --- |
@@ -150,25 +151,22 @@ List<String> tags = settings.getList("recent.tags", String.class, List.of());
 
 Available typed helpers include `getByte`, `getShort`, `getInt`, `getLong`, `getFloat`, `getDouble`, `getBigInteger`, `getBigDecimal`, `getBoolean`, `getChar`, `getEnum`, `getLocale`, `getTimeZone`, `getZoneId`, `getPath`, `getUri`, and the date/time getters.
 
-Generic typed access is also available. These overloads return `T` because the target type is provided explicitly, or inferred from the default value:
+Reference-type helpers also provide overloads that return `null` when the value is missing or cannot be converted:
 
 ```java
-Integer width = settings.get("window.width", 1024);
-Integer explicitWidth = settings.get("window.width", Integer.class, 1024);
+BigDecimal ratio = settings.getBigDecimal("window.scale");
 Locale locale = settings.getLocale("locale", Locale.US);
 TimeZone timeZone = settings.getTimeZone("timeZone", TimeZone.getTimeZone("UTC"));
 URI endpoint = settings.getUri("endpoint", URI.create("https://example.com"));
 ```
 
-Use the `Class<T>` overload when the default value is `null` or when you want the target type to be explicit.
-
 If a value is missing or cannot be converted, the provided default value is returned.
 
-Typed helpers and generic typed access use the same conversion rules. When string values are converted, the same type inference used while loading key-value, INI, YAML, and JSON files is applied first.
+Typed helpers use the same conversion rules. When string values are converted, the same type inference used while loading key-value, INI, YAML, and JSON files is applied first.
 
 Compatible numeric types are converted through `BigDecimal`: integer targets reject fractional values and out-of-range values, and floating-point targets reject `NaN` and infinity.
 
-Date/time getters and generic typed access also share one conversion rule. `Instant`, `Date`, `OffsetDateTime`, and `ZonedDateTime` can be converted as timeline values. `LocalDateTime`, `LocalDate`, and `LocalTime` can be converted from timeline values using the configured time zone. `LocalDateTime` and `LocalDate` can also be converted to timeline values using the configured time zone; `LocalTime` cannot because it has no date.
+Date/time getters share one conversion rule. `Instant`, `Date`, `OffsetDateTime`, and `ZonedDateTime` can be converted as timeline values. `LocalDateTime`, `LocalDate`, and `LocalTime` can be converted from timeline values using the configured time zone. `LocalDateTime` and `LocalDate` can also be converted to timeline values using the configured time zone; `LocalTime` cannot because it has no date.
 
 ```java
 AppSettings settings = AppSettings

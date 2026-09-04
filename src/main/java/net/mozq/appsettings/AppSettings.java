@@ -159,10 +159,10 @@ public final class AppSettings {
 	public String getString(String key, String defaultValue) {
 		lock.readLock().lock();
 		try {
-			if (!contains(key)) {
+			SettingsValue settingsValue = visibleValue(key);
+			if (settingsValue == null) {
 				return defaultValue;
 			}
-			SettingsValue settingsValue = values.get(key);
 			if (settingsValue instanceof SettingsValue.NullValue) {
 				return null;
 			}
@@ -186,132 +186,126 @@ public final class AppSettings {
 	public Object get(String key) {
 		lock.readLock().lock();
 		try {
-			if (!contains(key)) {
+			SettingsValue value = visibleValue(key);
+			if (value == null) {
 				return null;
 			}
-			return SettingsValues.object(values.get(key), nullable);
+			return SettingsValues.object(value, nullable);
 		} finally {
 			lock.readLock().unlock();
 		}
 	}
 
 	/**
-	 * Converts the value for a key to the default value type when possible.
+	 * Returns the typed Java value for a key, or the default when unavailable.
 	 */
-	public <T> T get(String key, T defaultValue) {
+	public Object get(String key, Object defaultValue) {
 		lock.readLock().lock();
 		try {
-			if (!contains(key)) {
+			SettingsValue settingsValue = visibleValue(key);
+			if (settingsValue == null) {
 				return defaultValue;
 			}
-			Object value = get(key);
-			if (value == null) {
-				return null;
-			}
-			if (defaultValue == null) {
-				return null;
-			}
-			@SuppressWarnings("unchecked")
-			Class<T> type = (Class<T>) defaultValue.getClass();
-			T converted = convertValue(value, type);
-			return converted == null ? defaultValue : converted;
-		} finally {
-			lock.readLock().unlock();
-		}
-	}
-
-	/**
-	 * Converts the value for a key to the requested type, or {@code null} when
-	 * unavailable.
-	 */
-	public <T> T get(String key, Class<T> type) {
-		Objects.requireNonNull(type, "type");
-		return get(key, type, null);
-	}
-
-	/**
-	 * Converts the value for a key to the requested type when possible.
-	 */
-	public <T> T get(String key, Class<T> type, T defaultValue) {
-		Objects.requireNonNull(type, "type");
-		lock.readLock().lock();
-		try {
-			if (!contains(key)) {
-				return defaultValue;
-			}
-			Object value = get(key);
-			if (value == null) {
-				return null;
-			}
-			T converted = convertValue(value, type);
-			return converted == null ? defaultValue : converted;
+			return SettingsValues.object(settingsValue, nullable);
 		} finally {
 			lock.readLock().unlock();
 		}
 	}
 
 	public int getInt(String key, int defaultValue) {
-		return get(key, Integer.class, defaultValue);
+		return getAs(key, Integer.class, defaultValue);
 	}
 
 	public byte getByte(String key, byte defaultValue) {
-		return get(key, Byte.class, defaultValue);
+		return getAs(key, Byte.class, defaultValue);
 	}
 
 	public short getShort(String key, short defaultValue) {
-		return get(key, Short.class, defaultValue);
+		return getAs(key, Short.class, defaultValue);
 	}
 
 	public long getLong(String key, long defaultValue) {
-		return get(key, Long.class, defaultValue);
+		return getAs(key, Long.class, defaultValue);
 	}
 
 	public float getFloat(String key, float defaultValue) {
-		return get(key, Float.class, defaultValue);
+		return getAs(key, Float.class, defaultValue);
 	}
 
 	public double getDouble(String key, double defaultValue) {
-		return get(key, Double.class, defaultValue);
+		return getAs(key, Double.class, defaultValue);
+	}
+
+	public BigInteger getBigInteger(String key) {
+		return getBigInteger(key, null);
 	}
 
 	public BigInteger getBigInteger(String key, BigInteger defaultValue) {
-		return get(key, BigInteger.class, defaultValue);
+		return getAs(key, BigInteger.class, defaultValue);
+	}
+
+	public BigDecimal getBigDecimal(String key) {
+		return getBigDecimal(key, null);
 	}
 
 	public BigDecimal getBigDecimal(String key, BigDecimal defaultValue) {
-		return get(key, BigDecimal.class, defaultValue);
+		return getAs(key, BigDecimal.class, defaultValue);
 	}
 
 	public boolean getBoolean(String key, boolean defaultValue) {
-		return get(key, Boolean.class, defaultValue);
+		return getAs(key, Boolean.class, defaultValue);
 	}
 
 	public char getChar(String key, char defaultValue) {
-		return get(key, Character.class, defaultValue);
+		return getAs(key, Character.class, defaultValue);
+	}
+
+	public <T extends Enum<T>> T getEnum(String key, Class<T> enumType) {
+		return getEnum(key, enumType, null);
 	}
 
 	public <T extends Enum<T>> T getEnum(String key, Class<T> enumType, T defaultValue) {
-		return get(key, enumType, defaultValue);
+		return getAs(key, enumType, defaultValue);
+	}
+
+	public Locale getLocale(String key) {
+		return getLocale(key, null);
 	}
 
 	public Locale getLocale(String key, Locale defaultValue) {
-		return get(key, Locale.class, defaultValue);
+		return getAs(key, Locale.class, defaultValue);
+	}
+
+	public TimeZone getTimeZone(String key) {
+		return getTimeZone(key, null);
 	}
 
 	public TimeZone getTimeZone(String key, TimeZone defaultValue) {
-		return get(key, TimeZone.class, defaultValue);
+		return getAs(key, TimeZone.class, defaultValue);
+	}
+
+	public ZoneId getZoneId(String key) {
+		return getZoneId(key, null);
 	}
 
 	public ZoneId getZoneId(String key, ZoneId defaultValue) {
-		return get(key, ZoneId.class, defaultValue);
+		return getAs(key, ZoneId.class, defaultValue);
+	}
+
+	public Path getPath(String key) {
+		return getPath(key, null);
 	}
 
 	public Path getPath(String key, Path defaultValue) {
-		return get(key, Path.class, defaultValue);
+		return getAs(key, Path.class, defaultValue);
+	}
+
+	public URI getUri(String key) {
+		return getUri(key, null);
 	}
 
 	public URI getUri(String key, URI defaultValue) {
-		return get(key, URI.class, defaultValue);
+		return getAs(key, URI.class, defaultValue);
 	}
 
 	public List<Object> getList(String key) {
@@ -328,6 +322,9 @@ public final class AppSettings {
 						.map(item -> SettingsValues.object(item, nullable))
 						.toList();
 			}
+			if (defaultValue == null) {
+				return null;
+			}
 			if (defaultValue.isEmpty()) {
 				return List.of();
 			}
@@ -342,6 +339,7 @@ public final class AppSettings {
 	}
 
 	public <T> List<T> getList(String key, Class<T> elementType, List<T> defaultValue) {
+		Objects.requireNonNull(elementType, "elementType");
 		lock.readLock().lock();
 		try {
 			SettingsValue value = visibleValue(key);
@@ -374,31 +372,59 @@ public final class AppSettings {
 	}
 
 	public Instant getInstant(String key, Instant defaultValue) {
-		return get(key, Instant.class, defaultValue);
+		return getAs(key, Instant.class, defaultValue);
+	}
+
+	public Instant getInstant(String key) {
+		return getInstant(key, null);
 	}
 
 	public Date getDate(String key, Date defaultValue) {
-		return get(key, Date.class, defaultValue);
+		return getAs(key, Date.class, defaultValue);
+	}
+
+	public Date getDate(String key) {
+		return getDate(key, null);
 	}
 
 	public LocalDateTime getLocalDateTime(String key, LocalDateTime defaultValue) {
-		return get(key, LocalDateTime.class, defaultValue);
+		return getAs(key, LocalDateTime.class, defaultValue);
+	}
+
+	public LocalDateTime getLocalDateTime(String key) {
+		return getLocalDateTime(key, null);
 	}
 
 	public LocalDate getLocalDate(String key, LocalDate defaultValue) {
-		return get(key, LocalDate.class, defaultValue);
+		return getAs(key, LocalDate.class, defaultValue);
+	}
+
+	public LocalDate getLocalDate(String key) {
+		return getLocalDate(key, null);
 	}
 
 	public LocalTime getLocalTime(String key, LocalTime defaultValue) {
-		return get(key, LocalTime.class, defaultValue);
+		return getAs(key, LocalTime.class, defaultValue);
+	}
+
+	public LocalTime getLocalTime(String key) {
+		return getLocalTime(key, null);
 	}
 
 	public OffsetDateTime getOffsetDateTime(String key, OffsetDateTime defaultValue) {
-		return get(key, OffsetDateTime.class, defaultValue);
+		return getAs(key, OffsetDateTime.class, defaultValue);
+	}
+
+	public OffsetDateTime getOffsetDateTime(String key) {
+		return getOffsetDateTime(key, null);
 	}
 
 	public ZonedDateTime getZonedDateTime(String key, ZonedDateTime defaultValue) {
-		return get(key, ZonedDateTime.class, defaultValue);
+		return getAs(key, ZonedDateTime.class, defaultValue);
+	}
+
+	public ZonedDateTime getZonedDateTime(String key) {
+		return getZonedDateTime(key, null);
 	}
 
 	/**
@@ -598,6 +624,25 @@ public final class AppSettings {
 
 	private boolean isVisible(SettingsValue value) {
 		return value != null && (nullable || !(value instanceof SettingsValue.NullValue));
+	}
+
+	private <T> T getAs(String key, Class<T> type, T defaultValue) {
+		Objects.requireNonNull(type, "type");
+		lock.readLock().lock();
+		try {
+			SettingsValue settingsValue = visibleValue(key);
+			if (settingsValue == null) {
+				return defaultValue;
+			}
+			Object value = SettingsValues.object(settingsValue, nullable);
+			if (value == null) {
+				return null;
+			}
+			T converted = convertValue(value, type);
+			return converted == null ? defaultValue : converted;
+		} finally {
+			lock.readLock().unlock();
+		}
 	}
 
 	private <T> T convertValue(Object value, Class<T> type) {

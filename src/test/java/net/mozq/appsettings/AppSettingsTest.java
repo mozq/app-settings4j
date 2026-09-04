@@ -169,6 +169,7 @@ class AppSettingsTest {
 			Map<String, String> strings = settings.set("theme", "dark").asStringMap();
 			List<Object> defaultList = settings.getList("missing", Arrays.asList("one", null));
 
+			assertEquals(null, settings.getList("missing", (List<?>)null));
 			assertThrows(UnsupportedOperationException.class, () -> strings.put("other", "value"));
 			assertThrows(UnsupportedOperationException.class, () -> defaultList.add("two"));
 		}
@@ -268,13 +269,11 @@ class AppSettingsTest {
 					.set("recent.tags", List.of("work", "archive"));
 
 			assertEquals(new BigDecimal("1024"), settings.get("window.width"));
-			assertEquals(1024, settings.get("window.width", 0));
-			assertEquals(1024, settings.get("window.width", Integer.class));
-			assertEquals(1024, settings.get("window.width", Integer.class, 0));
-			assertEquals(1024, settings.get("window.width", int.class, 0));
-			assertEquals((byte) 12, settings.get("byte", byte.class, (byte) 0));
-			assertEquals('A', settings.get("letter", char.class, '\0'));
-			assertTrue(settings.get("flag", boolean.class, false));
+			assertEquals("fallback", settings.get("missing", "fallback"));
+			assertEquals(1024, settings.getInt("window.width", 0));
+			assertEquals((byte) 12, settings.getByte("byte", (byte) 0));
+			assertEquals('A', settings.getChar("letter", '\0'));
+			assertTrue(settings.getBoolean("flag", false));
 			assertEquals(List.of("work", "archive"), settings.getList("recent.tags"));
 			assertEquals(List.of("work", "archive"), settings.getList("recent.tags", String.class));
 			assertEquals(List.of("work", "archive"), settings.getList("recent.tags", String.class, List.of()));
@@ -291,19 +290,17 @@ class AppSettingsTest {
 					.set("numericText", "42");
 
 			assertEquals(12, settings.getInt("doubleInteger", 0));
-			assertEquals(12, settings.get("doubleInteger", Integer.class, 0));
 			assertEquals((short) 123, settings.getShort("shortText", (short) 0));
-			assertEquals((short) 123, settings.get("shortText", Short.class, (short) 0));
 			assertEquals(1.25f, settings.getFloat("floatText", 0.0f));
-			assertEquals(1.25f, settings.get("floatText", Float.class, 0.0f));
 			assertEquals(123.5d, settings.getDouble("decimal", 0.0d));
-			assertEquals(123.5d, settings.get("decimal", Double.class, 0.0d));
-			assertEquals(new BigDecimal("12345678901234567890"), settings.get("bigInteger", BigDecimal.class));
-			assertEquals(new BigInteger("42"), settings.get("numericText", BigInteger.class));
+			assertEquals(new BigDecimal("12345678901234567890"), settings.getBigDecimal("bigInteger"));
+			assertEquals(new BigInteger("42"), settings.getBigInteger("numericText"));
 			assertEquals(new BigInteger("42"), settings.getBigInteger("numericText", BigInteger.ZERO));
 			assertEquals(new BigDecimal("42"), settings.getBigDecimal("numericText", BigDecimal.ZERO));
-			assertEquals(7, settings.get("decimal", Integer.class, 7));
-			assertEquals((byte) 7, settings.get("bigInteger", Byte.class, (byte) 7));
+			assertEquals(new BigDecimal("42"), settings.getBigDecimal("numericText"));
+			assertEquals(null, settings.getBigDecimal("missing"));
+			assertEquals(7, settings.getInt("decimal", 7));
+			assertEquals((byte) 7, settings.getByte("bigInteger", (byte) 7));
 		}
 
 		@Test
@@ -319,21 +316,16 @@ class AppSettingsTest {
 					.set("uppercaseBoolean", "TRUE");
 
 			assertTrue(settings.getBoolean("enabled", false));
-			assertTrue(settings.get("enabled", Boolean.class, false));
 			assertFalse(settings.getBoolean("disabled", true));
-			assertFalse(settings.get("disabled", Boolean.class, true));
 			assertEquals('A', settings.getChar("letter", '\0'));
-			assertEquals('A', settings.get("letter", Character.class, '\0'));
 			assertEquals(' ', settings.getChar("space", '\0'));
-			assertEquals(' ', settings.get("space", Character.class, '\0'));
 			assertEquals(SampleEnum.Second, settings.getEnum("enum", SampleEnum.class, SampleEnum.First));
-			assertEquals(SampleEnum.Second, settings.get("enum", SampleEnum.class, SampleEnum.First));
+			assertEquals(SampleEnum.Second, settings.getEnum("enum", SampleEnum.class));
 			assertEquals(Locale.JAPAN, settings.getLocale("locale", Locale.ROOT));
-			assertEquals(Locale.JAPAN, settings.get("locale", Locale.class, Locale.ROOT));
+			assertEquals(Locale.JAPAN, settings.getLocale("locale"));
 			assertEquals("Asia/Tokyo", settings.getTimeZone("timeZone", TimeZone.getTimeZone("UTC")).getID());
-			assertEquals("Asia/Tokyo", settings.get("timeZone", TimeZone.class, TimeZone.getTimeZone("UTC")).getID());
+			assertEquals("Asia/Tokyo", settings.getTimeZone("timeZone").getID());
 			assertFalse(settings.getBoolean("uppercaseBoolean", false));
-			assertFalse(settings.get("uppercaseBoolean", Boolean.class, false));
 		}
 
 		@Test
@@ -353,13 +345,13 @@ class AppSettingsTest {
 			AppSettings loaded = settings(null, "notes", "settings.properties").loadFrom(file);
 
 			assertEquals(outputDirectory, loaded.getPath("output.directory", Path.of(".")));
-			assertEquals(outputDirectory, loaded.get("output.directory", Path.class, Path.of(".")));
+			assertEquals(outputDirectory, loaded.getPath("output.directory"));
 			assertEquals(endpoint, loaded.getUri("endpoint", URI.create("https://example.org")));
-			assertEquals(endpoint, loaded.get("endpoint", URI.class, URI.create("https://example.org")));
+			assertEquals(endpoint, loaded.getUri("endpoint"));
 			assertEquals(zoneId, loaded.getZoneId("zoneId", ZoneId.of("UTC")));
-			assertEquals(zoneId, loaded.get("zoneId", ZoneId.class, ZoneId.of("UTC")));
-			assertEquals(zoneId, loaded.get("timeZone", ZoneId.class, ZoneId.of("UTC")));
-			assertEquals("Asia/Tokyo", loaded.get("zoneId", TimeZone.class, TimeZone.getTimeZone("UTC")).getID());
+			assertEquals(zoneId, loaded.getZoneId("zoneId"));
+			assertEquals(zoneId, loaded.getZoneId("timeZone", ZoneId.of("UTC")));
+			assertEquals("Asia/Tokyo", loaded.getTimeZone("zoneId", TimeZone.getTimeZone("UTC")).getID());
 			assertTrue(Files.readString(file).contains("zoneId=Asia/Tokyo"));
 			assertTrue(Files.readString(file).contains("endpoint=https://example.com/api"));
 		}
@@ -384,15 +376,22 @@ class AppSettingsTest {
 					.set("instantText", "2026-08-29T12:34:56Z");
 
 			assertEquals(Date.from(instant), settings.getDate("instant", new Date(0)));
+			assertEquals(Date.from(instant), settings.getDate("instant"));
 			assertEquals(LocalDateTime.parse("2026-08-29T12:34:56"), settings.getLocalDateTime("offset", LocalDateTime.MIN));
+			assertEquals(LocalDateTime.parse("2026-08-29T12:34:56"), settings.getLocalDateTime("offset"));
 			assertEquals(LocalDate.parse("2026-08-29"), settings.getLocalDate("zoned", LocalDate.MIN));
+			assertEquals(LocalDate.parse("2026-08-29"), settings.getLocalDate("zoned"));
 			assertEquals(LocalTime.parse("12:34:56"), settings.getLocalTime("instantText", LocalTime.MIN));
+			assertEquals(LocalTime.parse("12:34:56"), settings.getLocalTime("instantText"));
 			assertEquals(instant, settings.getInstant("localDateTime", Instant.EPOCH));
+			assertEquals(instant, settings.getInstant("localDateTime"));
 			assertEquals(Instant.parse("2026-08-29T00:00:00Z"), settings.getInstant("localDate", Instant.EPOCH));
 			assertEquals(Date.from(Instant.parse("2026-08-29T00:00:00Z")), settings.getDate("localDateText", new Date(0)));
 			assertEquals(Instant.EPOCH, settings.getInstant("localTime", Instant.EPOCH));
 			assertEquals(instant.atZone(utc.toZoneId()), settings.getZonedDateTime("instant", ZonedDateTime.now()));
+			assertEquals(instant.atZone(utc.toZoneId()), settings.getZonedDateTime("instant"));
 			assertEquals(OffsetDateTime.parse("2026-08-29T12:34:56Z"), settings.getOffsetDateTime("zoned", OffsetDateTime.MIN));
+			assertEquals(OffsetDateTime.parse("2026-08-29T12:34:56Z"), settings.getOffsetDateTime("zoned"));
 		}
 
 		@Test
@@ -408,7 +407,6 @@ class AppSettingsTest {
 			assertFalse(settings.getBoolean("boolean", false));
 			assertEquals(Instant.EPOCH, settings.getInstant("instant", Instant.EPOCH));
 			assertEquals(TimeZone.getTimeZone("UTC"), settings.getTimeZone("timeZone", TimeZone.getTimeZone("UTC")));
-			assertEquals(TimeZone.getTimeZone("UTC"), settings.get("timeZone", TimeZone.class, TimeZone.getTimeZone("UTC")));
 			assertEquals("fallback", settings.getString("missing", "fallback"));
 			assertEquals(List.of(1, 2), settings.getList("tags", Integer.class, List.of(1, 2)));
 		}
@@ -465,6 +463,7 @@ class AppSettingsTest {
 					.loadFrom(file);
 
 			assertTrue(loaded.contains("last.opened"));
+			assertEquals(null, loaded.get("last.opened", "fallback"));
 			assertEquals(null, loaded.getString("last.opened", "fallback"));
 			assertEquals(Arrays.asList("work", null, "archive"), loaded.getList("recent.tags", String.class, List.of()));
 			assertTrue(Files.readString(file).contains("last.opened=null"));

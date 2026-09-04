@@ -406,12 +406,6 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 			return index < source.length() && source.charAt(index) == c;
 		}
 
-		private static boolean isHexDigit(int c) {
-			return c >= '0' && c <= '9'
-					|| c >= 'a' && c <= 'f'
-					|| c >= 'A' && c <= 'F';
-		}
-
 		private static boolean isJsonDelimiter(char c) {
 			return Character.isWhitespace(c) || c == ',' || c == ']' || c == '}';
 		}
