@@ -185,4 +185,23 @@ class SimpleYamlSettingsFormatTest {
 		assertThrows(AppSettingsException.class,
 				() -> format.write(new StringWriter(), Map.of("a..b", "value"), null));
 	}
+
+	@Test
+	void rejectsAtAtRoot() {
+		assertThrows(AppSettingsException.class, () -> format.readValues(new StringReader("'@': enabled")));
+	}
+
+	@Test
+	void omitsObjectsThatContainOnlyNullValuesWhenNullableIsDisabled() throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		values.put("theme", SettingsValues.string("dark"));
+		values.put("editor.wrap", SettingsValues.nullValue());
+		values.put("editor.font.size", SettingsValues.nullValue());
+
+		StringWriter writer = new StringWriter();
+		format.writeValues(writer, values, null, false);
+		String content = writer.toString();
+
+		assertEquals("theme: 'dark'" + System.lineSeparator(), content);
+	}
 }

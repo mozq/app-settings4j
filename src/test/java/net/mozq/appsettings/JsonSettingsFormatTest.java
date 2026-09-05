@@ -7,6 +7,7 @@
 package net.mozq.appsettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -152,6 +153,45 @@ class JsonSettingsFormatTest {
 	void rejectsDottedKeysWithEmptyPathSegments() {
 		assertThrows(AppSettingsException.class,
 				() -> format.write(new StringWriter(), Map.of("a..b", "value"), null));
+	}
+
+	@Test
+	void omitsObjectsThatContainOnlyNullValuesWhenNullableIsDisabled() throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		values.put("theme", SettingsValues.string("dark"));
+		values.put("editor.wrap", SettingsValues.nullValue());
+		values.put("editor.font.size", SettingsValues.nullValue());
+
+		StringWriter writer = new StringWriter();
+		format.writeValues(writer, values, null, false);
+		String content = writer.toString();
+
+		assertFalse(content.contains("editor"));
+		assertTrue(content.contains("\"theme\": \"dark\""));
+	}
+
+	@Test
+	void rejectsAtAtRoot() {
+		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"@\": \"enabled\"}")));
+	}
+
+	@Test
+	void rejectsArraysContainingObjects() {
+		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"list\": [{\"a\": 1}]}")));
+	}
+
+	@Test
+	void escapesControlCharactersAsUnicodeEscapesOnWrite() throws IOException {
+		Map<String, Object> values = Map.of("value", "a\u0001b");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		String content = writer.toString();
+
+		assertTrue(content.contains("a\\u0001b"));
+
+		Map<String, Object> reloaded = format.read(new StringReader(content));
+		assertEquals("a\u0001b", reloaded.get("value"));
 	}
 
 	@Test

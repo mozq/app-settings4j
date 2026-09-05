@@ -44,6 +44,9 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	private static void flatten(Map<String, SettingsValue> values, String path, Map<?, ?> map) {
 		for (Map.Entry<?, ?> entry : map.entrySet()) {
 			String key = String.valueOf(entry.getKey());
+			if (NODE_VALUE_KEY.equals(key) && path.isEmpty()) {
+				throw new AppSettingsException("@ is reserved for nested values");
+			}
 			String fullKey = NODE_VALUE_KEY.equals(key) ? path : join(path, key);
 			Object value = entry.getValue();
 			if (value == null) {
