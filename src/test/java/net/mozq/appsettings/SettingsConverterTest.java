@@ -9,6 +9,7 @@ package net.mozq.appsettings;
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 
 import java.math.BigDecimal;
 import java.math.BigInteger;
@@ -185,6 +186,43 @@ class SettingsConverterTest {
 		void parsesIsoTextThroughTypeInferenceFirst() {
 			assertEquals(instant, convert("2026-08-29T12:34:56Z", Instant.class));
 			assertEquals(LocalDate.parse("2026-08-29"), convert("2026-08-29", LocalDate.class));
+		}
+	}
+
+	@Nested
+	class PrimitiveTypeTokens {
+		// AppSettings itself never passes a primitive Class token (getInt calls
+		// getAs(key, Integer.class, ...), not int.class), so this path only runs
+		// when SettingsConverter is called directly. It is still real, deliberate
+		// logic (see SettingsConverter.wrapperType/PRIMITIVE_WRAPPERS) worth
+		// covering on its own.
+
+		@Test
+		void convertsPrimitiveTypeTokensTheSameAsTheirWrapperTypes() {
+			assertEquals(Integer.valueOf(42), convert(new BigDecimal("42"), int.class));
+			assertEquals(Long.valueOf(42L), convert("42", long.class));
+			assertEquals(Byte.valueOf((byte) 7), convert("7", byte.class));
+			assertEquals(Short.valueOf((short) 7), convert("7", short.class));
+			assertEquals(Double.valueOf(1.25d), convert(new BigDecimal("1.25"), double.class));
+			assertEquals(Float.valueOf(1.25f), convert("1.25", float.class));
+			assertEquals(Boolean.TRUE, convert("true", boolean.class));
+			assertEquals(Character.valueOf('A'), convert("A", char.class));
+		}
+
+		@Test
+		void returnsNullRatherThanThrowingWhenConversionFails() {
+			assertNull(convert("not-a-number", int.class));
+			assertNull(convert("not-a-boolean", boolean.class));
+		}
+
+		@Test
+		void unboxingAFailedConversionToAPrimitiveLocalThrowsNullPointerException() {
+			assertThrows(NullPointerException.class, () -> {
+				int ignored = convert("not-a-number", int.class);
+			});
+			assertThrows(NullPointerException.class, () -> {
+				boolean ignored = convert("not-a-boolean", boolean.class);
+			});
 		}
 	}
 }
