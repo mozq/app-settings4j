@@ -171,6 +171,13 @@ class AppSettingsTest {
 			assertThrows(IllegalArgumentException.class, () -> settings.contains(""));
 			assertThrows(IllegalArgumentException.class, () -> settings.remove(null));
 			assertThrows(IllegalArgumentException.class, () -> settings.remove(""));
+			assertThrows(IllegalArgumentException.class, () -> settings.get(null));
+			assertThrows(IllegalArgumentException.class, () -> settings.get(""));
+			assertThrows(IllegalArgumentException.class, () -> settings.getString(null, "fallback"));
+			assertThrows(IllegalArgumentException.class, () -> settings.getString(""));
+			assertThrows(IllegalArgumentException.class, () -> settings.getInt(null, 0));
+			assertThrows(IllegalArgumentException.class, () -> settings.getList(null));
+			assertThrows(IllegalArgumentException.class, () -> settings.getList("", String.class));
 		}
 
 		@Test

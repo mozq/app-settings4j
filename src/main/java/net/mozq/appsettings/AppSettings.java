@@ -467,7 +467,6 @@ public final class AppSettings {
 	 * when nullable mode is enabled.
 	 */
 	public boolean contains(String key) {
-		requireKey(key);
 		lock.readLock().lock();
 		try {
 			return visibleValue(key) != null;
@@ -736,6 +735,7 @@ public final class AppSettings {
 	}
 
 	private SettingsValue visibleValue(String key) {
+		requireKey(key);
 		SettingsValue value = values.get(key);
 		return isVisible(value) ? value : null;
 	}
