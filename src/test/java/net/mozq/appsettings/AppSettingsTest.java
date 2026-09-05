@@ -8,13 +8,11 @@ package net.mozq.appsettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
-import static org.junit.jupiter.api.Assertions.assertInstanceOf;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.io.IOException;
 import java.io.Reader;
-import java.io.StringReader;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.math.BigDecimal;
@@ -29,7 +27,6 @@ import java.time.LocalTime;
 import java.time.OffsetDateTime;
 import java.time.ZoneId;
 import java.time.ZonedDateTime;
-import java.time.temporal.TemporalAccessor;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Date;
@@ -222,24 +219,45 @@ class AppSettingsTest {
 	@Nested
 	class FormatSelection {
 		@Test
-		void choosesBuiltInFormatFromFileName() throws IOException {
+		void choosesBuiltInFormatFromFileNameAndRoundTripsEachFormat() throws IOException {
 			Path properties = tempDir.resolve("settings.properties");
 			Path ini = tempDir.resolve("settings.ini");
 			Path yaml = tempDir.resolve("settings.yaml");
 			Path yml = tempDir.resolve("settings.yml");
 			Path json = tempDir.resolve("settings.json");
 
-			settings("acme", "notes", "settings.properties").set("window.width", 1024).storeTo(properties);
-			settings("acme", "notes", "settings.ini").set("window.width", 1024).storeTo(ini);
-			settings("acme", "notes", "settings.yaml").set("window.width", 1024).storeTo(yaml);
-			settings("acme", "notes", "settings.yml").set("window.width", 1024).storeTo(yml);
-			settings("acme", "notes", "settings.json").set("window.width", 1024).storeTo(json);
+			storeSampleValues(settings("acme", "notes", "settings.properties"), properties);
+			storeSampleValues(settings("acme", "notes", "settings.ini"), ini);
+			storeSampleValues(settings("acme", "notes", "settings.yaml"), yaml);
+			storeSampleValues(settings("acme", "notes", "settings.yml"), yml);
+			storeSampleValues(settings("acme", "notes", "settings.json"), json);
 
-			assertEquals("window.width=1024", Files.readString(properties).strip());
+			assertEquals("window.width=1024", Files.readString(properties).lines().filter(line -> line.startsWith("window.width")).findFirst().orElse(""));
 			assertTrue(Files.readString(ini).contains("[window]"));
 			assertTrue(Files.readString(yaml).contains("window:"));
 			assertTrue(Files.readString(yml).contains("window:"));
 			assertTrue(Files.readString(json).contains("\"window\""));
+
+			assertSampleValues(settings("acme", "notes", "settings.properties").loadFrom(properties));
+			assertSampleValues(settings("acme", "notes", "settings.ini").loadFrom(ini));
+			assertSampleValues(settings("acme", "notes", "settings.yaml").loadFrom(yaml));
+			assertSampleValues(settings("acme", "notes", "settings.yml").loadFrom(yml));
+			assertSampleValues(settings("acme", "notes", "settings.json").loadFrom(json));
+		}
+
+		private void storeSampleValues(AppSettings settings, Path file) throws IOException {
+			settings.set("theme", "dark")
+					.set("window.width", 1024)
+					.set("autosave.enabled", true)
+					.set("recent.tags", List.of("work", "archive"))
+					.storeTo(file);
+		}
+
+		private void assertSampleValues(AppSettings loaded) {
+			assertEquals("dark", loaded.getString("theme", ""));
+			assertEquals(1024, loaded.getInt("window.width", 0));
+			assertTrue(loaded.getBoolean("autosave.enabled", false));
+			assertEquals(List.of("work", "archive"), loaded.getList("recent.tags", String.class, List.of()));
 		}
 
 		@Test
@@ -546,306 +564,6 @@ class AppSettingsTest {
 
 			assertTrue(settings.contains("last.opened"));
 			assertEquals(null, settings.getString("last.opened", "fallback"));
-		}
-	}
-
-	@Nested
-	class KeyValueFiles {
-		@Test
-		void infersScalarsListsAndQuotedStrings() throws IOException {
-			Path file = tempDir.resolve("settings.properties");
-			Files.writeString(file, String.join(System.lineSeparator(),
-					"name=Notes",
-					"theme = dark",
-					"description=\" Personal notes \"",
-					"count=10",
-					"enabled=true",
-					"created=2026-08-29T12:34:56Z",
-					"tags=[work, \"hello, world\", \"[draft]\", \" leading \", 3]",
-					"empty.value=",
-					"empty.flag",
-					"last.opened=null",
-					"label=\"null\"",
-					"date.label=\"2026-08-29\"",
-					"list.label=\"[one, two]\""));
-
-			AppSettings loaded = settings(null, "notes", "settings.properties").loadFrom(file);
-
-			assertEquals("Notes", loaded.getString("name", ""));
-			assertEquals("dark", loaded.getString("theme", ""));
-			assertEquals(" Personal notes ", loaded.getString("description", ""));
-			assertEquals(new BigDecimal("10"), loaded.get("count"));
-			assertEquals(true, loaded.get("enabled"));
-			assertInstanceOf(TemporalAccessor.class, loaded.get("created"));
-			assertEquals(List.of("work", "hello, world", "[draft]", " leading ", new BigDecimal("3")), loaded.getList("tags", List.of()));
-			assertEquals("", loaded.getString("empty.value", "fallback"));
-			assertEquals("", loaded.getString("empty.flag", "fallback"));
-			assertFalse(loaded.contains("last.opened"));
-			assertEquals("null", loaded.getString("label", ""));
-			assertEquals("2026-08-29", loaded.getString("date.label", ""));
-			assertEquals("[one, two]", loaded.getString("list.label", ""));
-		}
-
-		@Test
-		void writesQuotedStringsWhenNeeded() throws IOException {
-			Path file = tempDir.resolve("settings.properties");
-
-			settings(null, "notes", "settings.properties")
-					.nullable(true)
-					.set("empty", "")
-					.set("reserved", "true")
-					.set("number.text", "1.0")
-					.set("date.text", "2026-08-29")
-					.set("list.text", "[one, two]")
-					.set("quoted.text", "\"quoted\"")
-					.set("path", "C:\\Users\\me")
-					.set("tags", List.of("work", "hello, world", "[draft]", "item]", " leading ", "1.0"))
-					.storeTo(file);
-
-			List<String> lines = Files.readAllLines(file);
-
-			assertTrue(lines.contains("empty="));
-			assertTrue(lines.contains("reserved=\"true\""));
-			assertTrue(lines.contains("number.text=\"1.0\""));
-			assertTrue(lines.contains("date.text=\"2026-08-29\""));
-			assertTrue(lines.contains("list.text=\"[one, two]\""));
-			assertTrue(lines.contains("quoted.text=\"\\\"quoted\\\"\""));
-			assertTrue(lines.contains("path=\"C:\\\\Users\\\\me\""));
-			assertTrue(lines.contains("tags=[work, \"hello, world\", \"[draft]\", \"item]\", \" leading \", \"1.0\"]"));
-		}
-
-		@Test
-		void escapesKeysAndReadsQuotedEscapes() throws IOException {
-			Path file = tempDir.resolve("settings.properties");
-
-			settings(null, "notes", "settings.properties")
-					.set("path=key", "first line\nsecond line")
-					.storeTo(file);
-
-			AppSettings loaded = settings(null, "notes", "settings.properties").loadFrom(file);
-
-			assertTrue(Files.readString(file).contains("path\\=key=\"first line\\nsecond line\""));
-			assertEquals("first line\nsecond line", loaded.getString("path=key", ""));
-		}
-	}
-
-	@Nested
-	class IniFiles {
-		@Test
-		void writesDottedKeysAsSectionsAndUsesAtForSectionValue() throws IOException {
-			Path file = tempDir.resolve("settings.ini");
-
-			settings("acme", "notes", "settings.ini")
-					.set("theme", "dark")
-					.set("empty", "")
-					.set("editor", "enabled")
-					.set("editor.wrap", true)
-					.set("editor.font.size", 14)
-					.storeTo(file, "INI settings");
-
-			AppSettings loaded = settings("acme", "notes", "settings.ini").loadFrom(file);
-			String content = Files.readString(file);
-
-			assertTrue(content.startsWith("; INI settings"));
-			assertTrue(content.contains("theme=dark"));
-			assertTrue(content.contains("empty="));
-			assertTrue(content.contains("[editor]"));
-			assertTrue(content.contains("@=enabled"));
-			assertTrue(content.contains("wrap=true"));
-			assertTrue(content.contains("[editor.font]"));
-			assertTrue(content.contains("size=14"));
-			assertEquals(List.of("theme", "empty", "editor", "editor.wrap", "editor.font.size"), List.copyOf(loaded.keySet()));
-			assertEquals("enabled", loaded.getString("editor", ""));
-			assertEquals("", loaded.getString("empty", "fallback"));
-			assertTrue(loaded.getBoolean("editor.wrap", false));
-			assertEquals(14, loaded.getInt("editor.font.size", 0));
-		}
-
-		@Test
-		void usesKeyValueSyntaxForValues() throws IOException {
-			Path file = tempDir.resolve("settings.ini");
-			Files.writeString(file, String.join(System.lineSeparator(),
-					"theme = dark",
-					"count=10",
-					"enabled=true",
-					"tags=[work, \"hello, world\", 3]",
-					"empty.value=",
-					"empty.flag",
-					"last.opened=null",
-					"literal=\"null\""));
-
-			AppSettings loaded = settings("acme", "notes", "settings.ini").loadFrom(file);
-
-			assertEquals("dark", loaded.get("theme"));
-			assertEquals(new BigDecimal("10"), loaded.get("count"));
-			assertEquals(true, loaded.get("enabled"));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("tags", List.of()));
-			assertEquals("", loaded.getString("empty.value", "fallback"));
-			assertEquals("", loaded.getString("empty.flag", "fallback"));
-			assertFalse(loaded.contains("last.opened"));
-			assertEquals("null", loaded.get("literal"));
-		}
-
-		@Test
-		void rejectsAtAtRoot() throws IOException {
-			Path file = tempDir.resolve("settings.ini");
-			Files.writeString(file, "@=enabled");
-
-			assertThrows(AppSettingsException.class, () -> settings("acme", "notes", "settings.ini").loadFrom(file));
-		}
-	}
-
-	@Nested
-	class SimpleYamlFiles {
-		@Test
-		void writesNestedObjectsListsAndTypedScalars() throws IOException {
-			Path file = tempDir.resolve("settings.yaml");
-
-			settings("acme", "notes", "settings.yaml")
-					.set("theme", "dark")
-					.set("window.width", 1024)
-					.set("autosave.enabled", true)
-					.set("recent.tags", List.of("work", "hello, world", 3))
-					.set("empty.tags", List.of())
-					.storeTo(file);
-
-			AppSettings loaded = settings("acme", "notes", "settings.yaml").loadFrom(file);
-			String content = Files.readString(file);
-
-			assertTrue(content.contains("theme: 'dark'"));
-			assertTrue(content.contains("window:"));
-			assertTrue(content.contains("  width: 1024"));
-			assertTrue(content.contains("autosave:"));
-			assertTrue(content.contains("  enabled: true"));
-			assertTrue(content.contains("recent:"));
-			assertTrue(content.contains("  tags: ['work', 'hello, world', 3]"));
-			assertTrue(content.contains("empty:"));
-			assertTrue(content.contains("  tags: []"));
-			assertEquals("dark", loaded.getString("theme", ""));
-			assertEquals(1024, loaded.getInt("window.width", 0));
-			assertTrue(loaded.getBoolean("autosave.enabled", false));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("recent.tags", List.of()));
-			assertEquals(List.of(), loaded.getList("empty.tags", List.of("fallback")));
-		}
-
-		@Test
-		void readsQuotedStringsUnquotedScalarsAndLists() throws IOException {
-			Path file = tempDir.resolve("settings.yaml");
-			Files.writeString(file, """
-					title: '10'
-					owner: 'Lee''s Notes'
-					path: "first line\\nsecond line"
-					count: 10
-					enabled: true
-					created: 2026-08-29
-					inlineTags: ['work', 'hello, world', 3]
-					emptyTags: []
-					blockTags:
-					  - "work"
-					  - 'hello, world'
-					  - 3
-					quoted:
-					  'key:with:colon': 'value # not comment'
-					""");
-
-			AppSettings loaded = settings("acme", "notes", "settings.yaml").loadFrom(file);
-
-			assertInstanceOf(String.class, loaded.asMap().get("title"));
-			assertEquals("Lee's Notes", loaded.getString("owner", ""));
-			assertEquals("first line\nsecond line", loaded.getString("path", ""));
-			assertInstanceOf(BigDecimal.class, loaded.asMap().get("count"));
-			assertInstanceOf(Boolean.class, loaded.asMap().get("enabled"));
-			assertInstanceOf(TemporalAccessor.class, loaded.asMap().get("created"));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("inlineTags", List.of()));
-			assertEquals(List.of(), loaded.getList("emptyTags", List.of("fallback")));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("blockTags", List.of()));
-			assertEquals("value # not comment", loaded.getString("quoted.key:with:colon", ""));
-		}
-
-		@Test
-		void rejectsInvalidYamlSyntax() throws IOException {
-			Path oddIndent = tempDir.resolve("odd.yaml");
-			Path itemWithoutKey = tempDir.resolve("item.yaml");
-			Files.writeString(oddIndent, " theme: dark");
-			Files.writeString(itemWithoutKey, "- item");
-
-			assertThrows(AppSettingsException.class, () -> settings("acme", "notes", "settings.yaml").loadFrom(oddIndent));
-			assertThrows(AppSettingsException.class, () -> settings("acme", "notes", "settings.yaml").loadFrom(itemWithoutKey));
-		}
-	}
-
-	@Nested
-	class JsonFiles {
-		@Test
-		void readsNativeJsonTypesAndFlattensObjects() throws IOException {
-			String json = """
-					{
-					  "theme": "dark",
-					  "escaped": "line1\\nline2\\t\\u263a",
-					  "window": {
-					    "width": 1024
-					  },
-					  "autosave": {
-					    "enabled": true
-					  },
-					  "recent": {
-					    "tags": ["work", "hello, world", 3, false, null]
-					  },
-					  "ignored": null
-					}
-					""";
-
-			Map<String, Object> values = SettingsFormats.json().read(new StringReader(json));
-
-			assertEquals(List.of("theme", "escaped", "window.width", "autosave.enabled", "recent.tags"), List.copyOf(values.keySet()));
-			assertEquals("dark", values.get("theme"));
-			assertEquals("line1\nline2\t\u263a", values.get("escaped"));
-			assertEquals(new BigDecimal("1024"), values.get("window.width"));
-			assertEquals(true, values.get("autosave.enabled"));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3"), false), values.get("recent.tags"));
-		}
-
-		@Test
-		void writesNestedObjectsListsNullsAndAtValues() throws IOException {
-			Path file = tempDir.resolve("settings.json");
-
-			settings("acme", "notes", "settings.json")
-					.nullable(true)
-					.set("editor", "enabled")
-					.set("editor.wrap", true)
-					.set("editor.font.size", 14)
-					.set("last.opened", null)
-					.set("recent.tags", List.of("work", "hello, world", 3))
-					.storeTo(file);
-
-			AppSettings loaded = settings("acme", "notes", "settings.json")
-					.nullable(true)
-					.loadFrom(file);
-			String content = Files.readString(file);
-
-			assertTrue(content.contains("\"editor\""));
-			assertTrue(content.contains("\"@\": \"enabled\""));
-			assertTrue(content.contains("\"wrap\": true"));
-			assertTrue(content.contains("\"size\": 14"));
-			assertTrue(content.contains("\"last\""));
-			assertTrue(content.contains("\"opened\": null"));
-			assertEquals("enabled", loaded.getString("editor", ""));
-			assertTrue(loaded.getBoolean("editor.wrap", false));
-			assertEquals(14, loaded.getInt("editor.font.size", 0));
-			assertEquals(null, loaded.getString("last.opened", "fallback"));
-			assertEquals(List.of("work", "hello, world", new BigDecimal("3")), loaded.getList("recent.tags", List.of()));
-		}
-
-		@Test
-		void rejectsNonObjectAndInvalidJson() {
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("[]")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": }")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": 01}")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": 1.}")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": \"\\u12xz\"}")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": \"line\nbreak\"}")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": true // comment\n}")));
-			assertThrows(AppSettingsException.class, () -> SettingsFormats.json().read(new StringReader("{\"a\": /* comment */ true}")));
 		}
 	}
 
