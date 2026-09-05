@@ -126,6 +126,10 @@ Use `set(String key, Object value)` to store values.
 | `Enum`, `Locale`, `TimeZone`, `ZoneId`, `Path`, `URI` | string |
 | `null` | null |
 
+A value of an unsupported type throws `IllegalArgumentException`.
+
+`Collection` elements are stored using the same rules, so a `Collection` may contain `null` elements; see [Null Values](#null-values).
+
 Read values as strings:
 
 ```java
@@ -227,6 +231,8 @@ settings.getString("last.opened", "fallback"); // null
 
 Use `remove(key)` to delete one key, or `clear()` to remove all keys.
 
+Lists can also contain null elements, for example `.set("recent.tags", Arrays.asList("work", null, "archive"))`. Null elements follow the same nullable-visibility rules as top-level keys: by default they are dropped from `getList(...)` results and from lists written to a file, and are written as `null` inside the list (for example `[work, null, archive]`) only when `nullable(true)` is enabled.
+
 ## Key-Value Files
 
 Key-value files use one entry per line:
@@ -244,6 +250,8 @@ description=" Personal notes "
 ```
 
 Whitespace around the `=` separator is ignored, so `theme = dark` is read as the key `theme` and value `dark`.
+
+Lines whose first non-whitespace character is `#` or `!` are comment lines and are ignored when loading, along with blank lines. A key that starts with `#` or `!` is escaped automatically when written, and unescaped back to its original form when read.
 
 When loading key-value files:
 
@@ -310,6 +318,8 @@ size=14
 
 The `@` key is reserved for the value of the current section when a key has both a value and child keys.
 
+Lines whose first non-whitespace character is `#` or `;` are comment lines and are ignored when loading, along with blank lines. A key that starts with `#` or `;` is escaped automatically when written, and unescaped back to its original form when read.
+
 ## Simple YAML Files
 
 The built-in YAML format is intentionally small. It supports objects created from dotted keys, scalar values, inline lists, empty lists, and block lists.
@@ -373,7 +383,7 @@ Dotted keys are written as nested JSON objects. If a key has both a value and ch
 }
 ```
 
-JSON comments are not supported.
+Standard JSON has no comment syntax. The built-in parser rejects `//` and `/* */` style comments as invalid JSON when loading, and any comments passed to `store(comments)` are silently ignored when saving to a JSON file.
 
 The built-in JSON parser follows standard JSON syntax for strings, numbers, booleans, null, arrays, and objects. String control characters must be escaped, Unicode escapes must be valid `\uXXXX` sequences, and numbers must not use leading zeros.
 
@@ -405,6 +415,8 @@ AppSettings settings = AppSettings
 
 Custom formats read and write ordinary Java values. `write()` receives the same visible inferred values as `asMap()`. Built-in formats keep additional internal type information so they can preserve null handling and ordered typed values consistently.
 
+Values returned by `read()` follow the same type rules as `set(String, Object)` (see [Values](#values)); a value of an unsupported type throws `IllegalArgumentException` when loaded.
+
 ## Notes
 
 - `app`, `fileName`, and setting keys are required.
@@ -412,7 +424,7 @@ Custom formats read and write ordinary Java values. `write()` receives the same 
 - `app`, `vendor`, and `fileName` must be names, not paths.
 - Dotted keys are used for nested formats.
 - The `@` key is reserved by INI, simple YAML, and JSON nested output.
-- File-level comments can be written, but existing comments are not preserved.
+- File-level comments can be written for key-value, INI, and simple YAML files, but existing comments are not preserved. JSON files ignore file-level comments entirely, since standard JSON has no comment syntax.
 
 ## License
 

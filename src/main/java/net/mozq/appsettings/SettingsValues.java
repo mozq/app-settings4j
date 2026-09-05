@@ -97,7 +97,7 @@ final class SettingsValues {
 			List<SettingsValue> values = collection.stream().map(SettingsValues::of).toList();
 			return list(formatList(values), values);
 		}
-		return string(String.valueOf(value));
+		throw new IllegalArgumentException("unsupported settings value type: " + value.getClass().getName());
 	}
 
 	static SettingsValue infer(String raw) {

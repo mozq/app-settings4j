@@ -210,6 +210,14 @@ class AppSettingsTest {
 		}
 
 		@Test
+		void rejectsUnsupportedValueTypes() {
+			AppSettings settings = settings("acme", "notes", "settings.properties");
+
+			assertThrows(IllegalArgumentException.class, () -> settings.set("map", Map.of("a", 1)));
+			assertThrows(IllegalArgumentException.class, () -> settings.set("list", List.of(Map.of("a", 1))));
+		}
+
+		@Test
 		void countsVisibleKeysAndClearsSettings() {
 			AppSettings settings = settings("acme", "notes", "settings.properties")
 					.set("theme", "dark")
