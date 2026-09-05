@@ -1,5 +1,7 @@
 # app-settings4j
 
+[![](https://jitpack.io/v/mozq/app-settings4j.svg)](https://jitpack.io/#mozq/app-settings4j)
+
 `app-settings4j` is a small Java library for reading and writing application settings in the standard configuration directory for each OS.
 
 It keeps keys in insertion order, supports common scalar types, can hide or preserve null values, and can store the same settings as key-value, INI, simple YAML, or JSON files.
@@ -8,7 +10,7 @@ It keeps keys in insertion order, supports common scalar types, can hide or pres
 
 Requires Java 21 or later.
 
-With JitPack:
+With JitPack (see the badge above for the latest version):
 
 ```gradle
 repositories {
@@ -16,7 +18,7 @@ repositories {
 }
 
 dependencies {
-    implementation "com.github.mozq:app-settings4j:v1.0.0"
+    implementation "com.github.mozq:app-settings4j:v1.2.0"
 }
 ```
 
