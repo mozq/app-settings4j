@@ -16,6 +16,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.time.temporal.TemporalAccessor;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -164,5 +165,24 @@ class SimpleYamlSettingsFormatTest {
 
 		LinkedHashMap<String, SettingsValue> reloaded = format.readValues(new StringReader(writer.toString()));
 		assertEquals(new SettingsValue.NullValue(), reloaded.get("lastOpened"));
+	}
+
+	@Test
+	void writesAndReadsListsContainingNullElementsWhenNullableIsEnabled() throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		values.put("tags", SettingsValues.of(Arrays.asList("work", null, "archive")));
+
+		StringWriter writer = new StringWriter();
+		format.writeValues(writer, values, null, true);
+		String content = writer.toString();
+
+		LinkedHashMap<String, SettingsValue> reloaded = format.readValues(new StringReader(content));
+		assertEquals(Arrays.asList("work", null, "archive"), SettingsValues.object(reloaded.get("tags"), true));
+	}
+
+	@Test
+	void rejectsDottedKeysWithEmptyPathSegments() {
+		assertThrows(AppSettingsException.class,
+				() -> format.write(new StringWriter(), Map.of("a..b", "value"), null));
 	}
 }

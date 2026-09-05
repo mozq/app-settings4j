@@ -83,7 +83,7 @@ final class TextSettingsCodec {
 				|| c == '\n'
 				|| c == '\r'
 				|| c == '\t'
-				|| (keyValueStyle && index == 0 && (c == '#' || c == '!'))
+				|| (index == 0 && (c == '#' || (keyValueStyle ? c == '!' : c == ';')))
 				|| (key && keyValueStyle && Character.isWhitespace(c))
 				|| (!key && index == 0 && c == ' ')
 				|| (!key && index == value.length() - 1 && c == ' ');

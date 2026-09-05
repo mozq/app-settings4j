@@ -15,6 +15,7 @@ import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigDecimal;
 import java.time.Instant;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -149,5 +150,82 @@ class KeyValueSettingsFormatTest {
 		Map<String, Object> values = format.read(new StringReader(text));
 
 		assertEquals(Map.of("theme", "dark"), values);
+	}
+
+	@Test
+	void escapesKeysStartingWithCommentMarkersAndEmbeddedWhitespaceOnRoundTrip() throws IOException {
+		LinkedHashMap<String, Object> values = new LinkedHashMap<>();
+		values.put("#hash", "value1");
+		values.put("!bang", "value2");
+		values.put("a b", "value3");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		Map<String, Object> reloaded = format.read(new StringReader(writer.toString()));
+
+		assertEquals("value1", reloaded.get("#hash"));
+		assertEquals("value2", reloaded.get("!bang"));
+		assertEquals("value3", reloaded.get("a b"));
+	}
+
+	@Test
+	void escapesValuesContainingEqualsSignOnRoundTrip() throws IOException {
+		Map<String, Object> values = Map.of("expression", "a=b");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		String content = writer.toString();
+
+		assertTrue(content.contains("expression=a\\=b"));
+
+		Map<String, Object> reloaded = format.read(new StringReader(content));
+		assertEquals("a=b", reloaded.get("expression"));
+	}
+
+	@Test
+	void unescapesKeyEndingInALoneTrailingBackslash() throws IOException {
+		Map<String, Object> values = format.read(new StringReader("key\\"));
+
+		assertEquals("", values.get("key\\"));
+	}
+
+	@Test
+	void unquotesValueEndingInALoneTrailingBackslashBeforeTheClosingQuote() throws IOException {
+		Map<String, Object> values = format.read(new StringReader("key=\"ab\\\""));
+
+		assertEquals("ab\\", values.get("key"));
+	}
+
+	@Test
+	void parsesListElementEndingInALoneTrailingBackslash() throws IOException {
+		Map<String, Object> values = format.read(new StringReader("tags=[a\\]"));
+
+		assertEquals(List.of("a\\"), values.get("tags"));
+	}
+
+	@Test
+	void writesAndReadsListsContainingNullElementsWhenNullableIsEnabled() throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		values.put("tags", SettingsValues.of(Arrays.asList("work", null, "archive")));
+
+		StringWriter writer = new StringWriter();
+		format.writeValues(writer, values, null, true);
+		String content = writer.toString();
+
+		assertTrue(content.contains("tags=[work, null, archive]"));
+
+		LinkedHashMap<String, SettingsValue> reloaded = format.readValues(new StringReader(content));
+		assertEquals(Arrays.asList("work", null, "archive"), SettingsValues.object(reloaded.get("tags"), true));
+	}
+
+	@Test
+	void doesNotTreatDotsAsPathSeparatorsUnlikeNestedFormats() throws IOException {
+		Map<String, Object> values = Map.of("a..b", "value");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		Map<String, Object> reloaded = format.read(new StringReader(writer.toString()));
+
+		assertEquals("value", reloaded.get("a..b"));
 	}
 }

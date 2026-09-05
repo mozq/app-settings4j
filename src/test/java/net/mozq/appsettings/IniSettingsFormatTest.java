@@ -15,6 +15,7 @@ import java.io.IOException;
 import java.io.StringReader;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.util.Arrays;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -109,6 +110,24 @@ class IniSettingsFormatTest {
 	}
 
 	@Test
+	void escapesKeysStartingWithCommentMarkersOnRoundTrip() throws IOException {
+		Map<String, Object> values = new LinkedHashMap<>();
+		values.put("#hash", "value1");
+		values.put(";semicolon", "value2");
+		values.put("!bang", "value3");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		String content = writer.toString();
+
+		Map<String, Object> reloaded = format.read(new StringReader(content));
+
+		assertEquals("value1", reloaded.get("#hash"));
+		assertEquals("value2", reloaded.get(";semicolon"));
+		assertEquals("value3", reloaded.get("!bang"));
+	}
+
+	@Test
 	void writesAndReadsNullValuesWhenNullableIsEnabled() throws IOException {
 		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 		values.put("lastOpened", SettingsValues.nullValue());
@@ -120,5 +139,40 @@ class IniSettingsFormatTest {
 
 		LinkedHashMap<String, SettingsValue> reloaded = format.readValues(new StringReader(writer.toString()));
 		assertEquals(new SettingsValue.NullValue(), reloaded.get("lastOpened"));
+	}
+
+	@Test
+	void writesAndReadsListsContainingNullElementsWhenNullableIsEnabled() throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		values.put("tags", SettingsValues.of(Arrays.asList("work", null, "archive")));
+
+		StringWriter writer = new StringWriter();
+		format.writeValues(writer, values, null, true);
+		String content = writer.toString();
+
+		assertTrue(content.contains("tags=[work, null, archive]"));
+
+		LinkedHashMap<String, SettingsValue> reloaded = format.readValues(new StringReader(content));
+		assertEquals(Arrays.asList("work", null, "archive"), SettingsValues.object(reloaded.get("tags"), true));
+	}
+
+	@Test
+	void escapesValuesContainingEqualsSignOnRoundTrip() throws IOException {
+		Map<String, Object> values = Map.of("expression", "a=b");
+
+		StringWriter writer = new StringWriter();
+		format.write(writer, values, null);
+		String content = writer.toString();
+
+		assertTrue(content.contains("expression=a\\=b"));
+
+		Map<String, Object> reloaded = format.read(new StringReader(content));
+		assertEquals("a=b", reloaded.get("expression"));
+	}
+
+	@Test
+	void rejectsDottedKeysWithEmptyPathSegments() {
+		assertThrows(AppSettingsException.class,
+				() -> format.write(new StringWriter(), Map.of("a..b", "value"), null));
 	}
 }
