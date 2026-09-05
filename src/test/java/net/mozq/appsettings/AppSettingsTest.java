@@ -8,6 +8,7 @@ package net.mozq.appsettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
@@ -119,6 +120,25 @@ class AppSettingsTest {
 
 			assertThrows(AppSettingsException.class, settings::path);
 		}
+
+		@Test
+		void publicFactoryResolvesAPathUnderTheRealEnvironment() {
+			AppSettings settings = AppSettings.of("acme", "notes-test-suite", "settings.properties");
+
+			Path path = settings.path();
+
+			assertTrue(path.isAbsolute());
+			assertTrue(path.endsWith(Path.of("acme", "notes-test-suite", "settings.properties")));
+		}
+
+		@Test
+		void currentEnvironmentReflectsRealSystemState() {
+			AppEnvironment environment = AppEnvironment.current();
+
+			assertEquals(System.getProperty("os.name"), environment.osName());
+			assertEquals(System.getProperty("user.home"), environment.userHome());
+			assertEquals(System.getenv(), environment.env());
+		}
 	}
 
 	@Nested
@@ -130,6 +150,18 @@ class AppSettingsTest {
 			settings.loadFrom(tempDir.resolve("missing.properties"));
 
 			assertTrue(settings.asStringMap().isEmpty());
+		}
+
+		@Test
+		void loadAndStoreResolveThePathInternally() throws IOException {
+			AppSettings stored = settings("acme", "notes", "settings.properties")
+					.set("theme", "dark")
+					.store();
+
+			AppSettings loaded = settings("acme", "notes", "settings.properties").load();
+
+			assertTrue(Files.exists(stored.path()));
+			assertEquals("dark", loaded.getString("theme", ""));
 		}
 
 		@Test
@@ -270,6 +302,14 @@ class AppSettingsTest {
 					.storeTo(file);
 
 			assertEquals("theme=dark", Files.readString(file).strip());
+		}
+
+		@Test
+		void selectsBuiltInFormatsCaseInsensitively() {
+			assertSame(SettingsFormats.ini(), SettingsFormats.byFileName("SETTINGS.INI"));
+			assertSame(SettingsFormats.simpleYaml(), SettingsFormats.byFileName("settings.YAML"));
+			assertSame(SettingsFormats.simpleYaml(), SettingsFormats.byFileName("settings.Yml"));
+			assertSame(SettingsFormats.json(), SettingsFormats.byFileName("settings.JSON"));
 		}
 	}
 
