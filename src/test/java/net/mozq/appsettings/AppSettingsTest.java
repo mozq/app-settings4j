@@ -373,6 +373,18 @@ class AppSettingsTest {
 		}
 
 		@Test
+		void rejectsIllFormedLocaleTags() {
+			AppSettings settings = settings(null, "notes", "settings.properties")
+					.set("locale", "not-a-locale-!!!")
+					.set("emptyLocale", "");
+
+			assertEquals(Locale.ROOT, settings.getLocale("locale", Locale.ROOT));
+			assertEquals(null, settings.getLocale("locale"));
+			assertEquals(Locale.ROOT, settings.getLocale("emptyLocale", Locale.ROOT));
+			assertEquals(null, settings.getLocale("emptyLocale"));
+		}
+
+		@Test
 		void convertsApplicationSettingTypesThroughSharedRules() throws IOException {
 			Path file = tempDir.resolve("settings.properties");
 			Path outputDirectory = Path.of("data", "output");

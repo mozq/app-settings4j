@@ -67,7 +67,7 @@ final class SettingsConverter {
 			return parseCharacter(value.toString());
 		}
 		if (type == Locale.class) {
-			return Locale.forLanguageTag(value.toString());
+			return parseLocale(value.toString());
 		}
 		if (type == TimeZone.class) {
 			return toTimeZone(value);
@@ -107,7 +107,7 @@ final class SettingsConverter {
 			return parseCharacter(value);
 		}
 		if (type == Locale.class) {
-			return Locale.forLanguageTag(value);
+			return parseLocale(value);
 		}
 		if (type == TimeZone.class) {
 			return toTimeZone(value);
@@ -333,6 +333,10 @@ final class SettingsConverter {
 			throw new IllegalArgumentException("not a character: " + value);
 		}
 		return value.charAt(0);
+	}
+
+	private static Locale parseLocale(String value) {
+		return new Locale.Builder().setLanguageTag(value).build();
 	}
 
 	private static TimeZone parseTimeZone(String value) {
