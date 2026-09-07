@@ -35,16 +35,15 @@ import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.locks.ReadWriteLock;
 import java.util.concurrent.locks.ReentrantReadWriteLock;
+import java.util.function.Supplier;
 
 /**
  * Reads and writes ordered application settings in the standard configuration
  * directory for the current operating system.
  */
 public final class AppSettings {
-	private final String vendor;
-	private final String app;
+	private final Supplier<Path> directorySupplier;
 	private final String fileName;
-	private final AppEnvironment environment;
 	private final LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 	private final ReadWriteLock lock = new ReentrantReadWriteLock();
 	private SettingsFormat format;
@@ -64,11 +63,74 @@ public final class AppSettings {
 		return new AppSettings(vendor, app, fileName, environment);
 	}
 
+	/**
+	 * Creates settings for a file inside {@code dir} (see
+	 * {@link #directory(String, String, String)}), keeping the vendor/app
+	 * that {@code dir} was resolved for.
+	 */
+	public static AppSettings of(AppSettingsDirectory dir, String fileName) {
+		return new AppSettings(dir, fileName);
+	}
+
+	/**
+	 * Creates settings bound directly to the given file, instead of the
+	 * OS-specific {@code <base>/<vendor>/<app>/<fileName>} location. The
+	 * format is selected from the file name, the same as
+	 * {@link #of(String, String, String)}.
+	 */
+	public static AppSettings of(Path file) {
+		return new AppSettings(file);
+	}
+
+	/**
+	 * Resolves the app's settings directory itself (no subdirectory).
+	 */
+	public static AppSettingsDirectory directory(String vendor, String app) {
+		return directory(vendor, app, null);
+	}
+
+	/**
+	 * Resolves a subdirectory of the app's settings directory
+	 * ({@code <base>/<vendor>/<app>/<subDirectory>}). Pass {@code null} for
+	 * {@code subDirectory} to get the app directory itself.
+	 */
+	public static AppSettingsDirectory directory(String vendor, String app, String subDirectory) {
+		return directory(vendor, app, subDirectory, AppEnvironment.current());
+	}
+
+	static AppSettingsDirectory directory(String vendor, String app, String subDirectory, AppEnvironment environment) {
+		Objects.requireNonNull(environment, "environment");
+		String normalizedVendor = normalizeVendor(vendor);
+		String requiredApp = requirePathName(app, "app");
+		Path appDirectory = resolveAppDirectory(normalizedVendor, requiredApp, environment);
+		Path resolved = subDirectory == null
+				? appDirectory
+				: appDirectory.resolve(requirePathName(subDirectory, "subDirectory"));
+		return new AppSettingsDirectory(resolved, normalizedVendor, requiredApp);
+	}
+
 	private AppSettings(String vendor, String app, String fileName, AppEnvironment environment) {
-		this.vendor = normalizeVendor(vendor);
-		this.app = requirePathName(app, "app");
+		String normalizedVendor = normalizeVendor(vendor);
+		String requiredApp = requirePathName(app, "app");
+		Objects.requireNonNull(environment, "environment");
 		this.fileName = requireFileName(fileName);
-		this.environment = Objects.requireNonNull(environment, "environment");
+		this.directorySupplier = () -> resolveAppDirectory(normalizedVendor, requiredApp, environment);
+		this.format = SettingsFormats.byFileName(this.fileName);
+	}
+
+	private AppSettings(AppSettingsDirectory dir, String fileName) {
+		Objects.requireNonNull(dir, "dir");
+		Path resolvedDirectory = dir.path();
+		this.fileName = requireFileName(fileName);
+		this.directorySupplier = () -> resolvedDirectory;
+		this.format = SettingsFormats.byFileName(this.fileName);
+	}
+
+	private AppSettings(Path file) {
+		Objects.requireNonNull(file, "file");
+		Path parent = file.getParent();
+		this.fileName = file.getFileName().toString();
+		this.directorySupplier = parent != null ? () -> parent : () -> file.getFileSystem().getPath("");
 		this.format = SettingsFormats.byFileName(this.fileName);
 	}
 
@@ -76,11 +138,7 @@ public final class AppSettings {
 	 * Returns the OS-specific settings file path.
 	 */
 	public Path path() {
-		Path baseDirectory = baseConfigDirectory();
-		if (vendor == null) {
-			return baseDirectory.resolve(app).resolve(fileName);
-		}
-		return baseDirectory.resolve(vendor).resolve(app).resolve(fileName);
+		return directorySupplier.get().resolve(fileName);
 	}
 
 	/**
@@ -714,7 +772,14 @@ public final class AppSettings {
 		}
 	}
 
-	private Path baseConfigDirectory() {
+	private static Path resolveAppDirectory(String normalizedVendor, String requiredApp, AppEnvironment environment) {
+		Path baseDirectory = baseConfigDirectory(environment);
+		return normalizedVendor == null
+				? baseDirectory.resolve(requiredApp)
+				: baseDirectory.resolve(normalizedVendor).resolve(requiredApp);
+	}
+
+	private static Path baseConfigDirectory(AppEnvironment environment) {
 		String osName = environment.osName() == null ? "" : environment.osName().toLowerCase(Locale.ROOT);
 		String userHome = requireUserHome(environment.userHome());
 		if (osName.startsWith("windows")) {

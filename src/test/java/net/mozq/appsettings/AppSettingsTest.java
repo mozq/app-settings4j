@@ -8,6 +8,7 @@ package net.mozq.appsettings;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertFalse;
+import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertSame;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -138,6 +139,141 @@ class AppSettingsTest {
 			assertEquals(System.getProperty("os.name"), environment.osName());
 			assertEquals(System.getProperty("user.home"), environment.userHome());
 			assertEquals(System.getenv(), environment.env());
+		}
+
+		@Test
+		void resolvesDirectoryWithVendorAndSubdirectory() {
+			AppSettingsDirectory dir = directory("acme", "notes", "presets", "Linux", Map.of());
+
+			assertEquals(tempDir.resolve(".config").resolve("acme").resolve("notes").resolve("presets"), dir.path());
+			assertEquals("acme", dir.vendor());
+			assertEquals("notes", dir.app());
+		}
+
+		@Test
+		void resolvesDirectoryWithoutVendorOrSubdirectory() {
+			AppSettingsDirectory dir = directory(null, "notes", null, "Linux", Map.of());
+
+			assertEquals(tempDir.resolve(".config").resolve("notes"), dir.path());
+			assertNull(dir.vendor());
+			assertEquals("notes", dir.app());
+		}
+
+		@Test
+		void rejectsInvalidNamesWhenResolvingDirectory() {
+			AppEnvironment environment = environment("Linux", Map.of());
+
+			assertThrows(IllegalArgumentException.class, () -> AppSettings.directory("acme/notes", "notes", null, environment));
+			assertThrows(IllegalArgumentException.class, () -> AppSettings.directory("acme", "", null, environment));
+			assertThrows(IllegalArgumentException.class, () -> AppSettings.directory("acme", "notes", "../presets", environment));
+		}
+
+		@Test
+		void rejectsMissingUserHomeImmediatelyWhenResolvingDirectory() {
+			assertThrows(AppSettingsException.class,
+					() -> AppSettings.directory("acme", "notes", null, new AppEnvironment("Linux", "", Map.of())));
+		}
+
+		@Test
+		void createsSettingsForAFileInsideADirectory() {
+			AppSettingsDirectory dir = directory("acme", "notes", "presets", "Linux", Map.of());
+
+			AppSettings settings = AppSettings.of(dir, "dark-theme.json");
+
+			assertEquals(dir.path().resolve("dark-theme.json"), settings.path());
+		}
+
+		@Test
+		void rejectsPathLikeFileNameWhenUsingADirectory() {
+			AppSettingsDirectory dir = directory("acme", "notes", "presets", "Linux", Map.of());
+
+			assertThrows(IllegalArgumentException.class, () -> AppSettings.of(dir, "../escape.json"));
+		}
+
+		@Test
+		void ensureExistsCreatesTheDirectoryAndItsParents() throws IOException {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir.resolve("acme").resolve("notes").resolve("presets"), "acme", "notes");
+
+			assertFalse(Files.isDirectory(dir.path()));
+
+			AppSettingsDirectory result = dir.ensureExists();
+
+			assertTrue(Files.isDirectory(dir.path()));
+			assertSame(dir, result);
+		}
+
+		@Test
+		void ensureExistsDoesNothingWhenAlreadyPresent() throws IOException {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir, "acme", "notes");
+
+			dir.ensureExists();
+
+			assertTrue(Files.isDirectory(dir.path()));
+		}
+
+		@Test
+		void uniqueFileNameReturnsTheFirstGeneratedNameWhenNothingCollides() {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir, "acme", "notes");
+
+			String fileName = dir.uniqueFileName(attempt -> "preset-" + attempt + ".json");
+
+			assertEquals("preset-1.json", fileName);
+		}
+
+		@Test
+		void uniqueFileNameSkipsGeneratedNamesThatAlreadyExist() throws IOException {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir, "acme", "notes");
+			Files.createFile(tempDir.resolve("preset-1.json"));
+			Files.createFile(tempDir.resolve("preset-2.json"));
+
+			String fileName = dir.uniqueFileName(attempt -> "preset-" + attempt + ".json");
+
+			assertEquals("preset-3.json", fileName);
+		}
+
+		@Test
+		void uniqueFileNameThrowsAfterExhaustingAttempts() throws IOException {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir, "acme", "notes");
+			Files.createFile(tempDir.resolve("taken.json"));
+
+			assertThrows(AppSettingsException.class, () -> dir.uniqueFileName(attempt -> "taken.json"));
+		}
+
+		@Test
+		void storesAndLoadsUsingADirectoryBasedFile() throws IOException {
+			AppSettingsDirectory dir = new AppSettingsDirectory(tempDir.resolve("presets"), "acme", "notes");
+
+			AppSettings.of(dir, "dark-theme.json").set("theme", "dark").store();
+			AppSettings loaded = AppSettings.of(dir, "dark-theme.json").load();
+
+			assertEquals("dark", loaded.getString("theme", ""));
+		}
+
+		@Test
+		void createsSettingsBoundDirectlyToAFile() {
+			Path file = tempDir.resolve("custom").resolve("settings.json");
+
+			AppSettings settings = AppSettings.of(file);
+
+			assertEquals(file, settings.path());
+		}
+
+		@Test
+		void createsSettingsForABareRelativeFileName() {
+			AppSettings settings = AppSettings.of(Path.of("settings.json"));
+
+			assertEquals(Path.of("settings.json"), settings.path());
+		}
+
+		@Test
+		void storesAndLoadsUsingAPathBasedFile() throws IOException {
+			Path file = tempDir.resolve("custom-settings.json");
+
+			AppSettings.of(file).set("theme", "dark").store();
+			AppSettings loaded = AppSettings.of(file).load();
+
+			assertEquals("dark", loaded.getString("theme", ""));
+			assertTrue(Files.readString(file).contains("\"theme\""));
 		}
 	}
 
@@ -921,6 +1057,10 @@ class AppSettingsTest {
 
 	private AppEnvironment environment(String osName, Map<String, String> env) {
 		return new AppEnvironment(osName, tempDir.toString(), env);
+	}
+
+	private AppSettingsDirectory directory(String vendor, String app, String subDirectory, String osName, Map<String, String> env) {
+		return AppSettings.directory(vendor, app, subDirectory, environment(osName, env));
 	}
 
 	private enum SampleEnum {

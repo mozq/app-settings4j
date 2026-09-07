@@ -63,6 +63,49 @@ For the example above, the path is:
 AppSettings.of(null, "notes", "settings.properties");
 ```
 
+### Files Inside a Subdirectory
+
+`AppSettings.directory(vendor, app)` resolves the app's settings directory itself, and `AppSettings.directory(vendor, app, subDirectory)` resolves a subdirectory of it (e.g. a folder of presets). Pass the resulting `AppSettingsDirectory` to `AppSettings.of(dir, fileName)` to create settings for a file inside it, keeping the `vendor`/`app` that produced the directory:
+
+```java
+AppSettingsDirectory presets = AppSettings.directory("acme", "notes", "presets");
+
+for (Path preset : Files.list(presets.path()).toList()) {
+    // present preset.getFileName() to the user
+}
+
+AppSettings.of(presets, "dark-theme.json").load();
+```
+
+`fileName` here follows the same rules as `AppSettings.of(vendor, app, fileName)`: it must be a plain name, not a path.
+
+`AppSettingsDirectory.ensureExists()` creates the directory, including any missing parent directories, if it does not already exist yet (e.g. before writing the first file into it):
+
+```java
+AppSettings.directory("acme", "notes", "presets").ensureExists();
+```
+
+`AppSettingsDirectory.uniqueFileName(fileNameGenerator)` calls the given generator with an increasing attempt number, starting at 1, until it returns a name that does not already exist in the directory, then returns that name. Use it to avoid overwriting an existing file when generating a new file name automatically, such as when saving a preset:
+
+```java
+AppSettingsDirectory presets = AppSettings.directory("acme", "notes", "presets").ensureExists();
+
+String fileName = presets.uniqueFileName(attempt -> "preset-" + attempt + ".json");
+// -> "preset-1.json", or "preset-2.json" if that name is already taken, and so on
+
+AppSettings.of(presets, fileName).set("theme", "dark").store();
+```
+
+It throws `AppSettingsException` if no unique name is found within 10,000 attempts.
+
+### Files at an Arbitrary Location
+
+`AppSettings.of(file)` creates settings bound directly to a given `Path`, instead of the OS-specific `<base>/<vendor>/<app>/<fileName>` location. The format is still selected from the file name. Use this for files that are not organized under `vendor`/`app` at all, such as a path given on the command line:
+
+```java
+AppSettings settings = AppSettings.of(Path.of(configPathArgument)).load();
+```
+
 ## Formats
 
 The format is selected from the file name by default.
