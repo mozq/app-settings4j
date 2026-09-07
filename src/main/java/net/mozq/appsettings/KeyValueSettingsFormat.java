@@ -11,31 +11,38 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 final class KeyValueSettingsFormat implements InternalSettingsFormat {
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
-		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
-		BufferedReader bufferedReader = new BufferedReader(reader);
-		String line;
-		while ((line = bufferedReader.readLine()) != null) {
-			parseLine(values, line);
-		}
-		return values;
+		return readValuesWithComments(reader).values();
 	}
 
 	@Override
-	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
-		BufferedWriter bufferedWriter = new BufferedWriter(writer);
-		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) {
-				bufferedWriter.write("# ");
-				bufferedWriter.write(line);
-				bufferedWriter.newLine();
+	public SettingsReadResult readValuesWithComments(Reader reader) throws IOException {
+		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
+		BufferedReader bufferedReader = new BufferedReader(reader);
+		List<String> comments = new ArrayList<>();
+		String line;
+		while ((line = bufferedReader.readLine()) != null) {
+			String comment = SettingsComments.parseLine(line, '#', '!');
+			if (comment != null) {
+				comments.add(comment);
+				continue;
 			}
+			parseLine(values, line);
 		}
+		return new SettingsReadResult(values, comments);
+	}
+
+	@Override
+	public void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException {
+		BufferedWriter bufferedWriter = new BufferedWriter(writer);
+		SettingsComments.write(bufferedWriter, comments, "# ");
 		for (Map.Entry<String, SettingsValue> entry : values.entrySet()) {
 			if (entry.getValue() instanceof SettingsValue.NullValue && !nullable) {
 				continue;
@@ -49,8 +56,7 @@ final class KeyValueSettingsFormat implements InternalSettingsFormat {
 	}
 
 	private static void parseLine(Map<String, SettingsValue> values, String line) {
-		String trimmed = line.stripLeading();
-		if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith("!")) {
+		if (line.isBlank()) {
 			return;
 		}
 		int separator = TextSettingsCodec.findSeparator(line);
@@ -62,4 +68,5 @@ final class KeyValueSettingsFormat implements InternalSettingsFormat {
 			values.put(SettingsValues.unescape(line.substring(0, separator).strip()), value);
 		}
 	}
+
 }

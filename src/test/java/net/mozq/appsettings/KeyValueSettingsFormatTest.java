@@ -153,6 +153,35 @@ class KeyValueSettingsFormatTest {
 	}
 
 	@Test
+	void readsComments() throws IOException {
+		String text = String.join("\n",
+				"",
+				"#  First line  ",
+				"!  Second line  ",
+				"",
+				"theme=dark",
+				"# later comment");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("First line", "Second line", "later comment"), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
+	void keepsEmptyCommentLines() throws IOException {
+		String text = String.join("\n",
+				"#",
+				"theme=dark",
+				"!  ");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("", ""), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
 	void escapesKeysStartingWithCommentMarkersAndEmbeddedWhitespaceOnRoundTrip() throws IOException {
 		LinkedHashMap<String, Object> values = new LinkedHashMap<>();
 		values.put("#hash", "value1");

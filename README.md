@@ -109,6 +109,8 @@ Saving writes through a temporary file and replace operation when possible. If a
 | `keySet()` | Return visible keys in insertion order |
 | `size()` / `isEmpty()` | Count visible keys |
 | `remove(key)` / `clear()` | Delete one key or all keys |
+| `comments(List<String> comments)` / `comments()` | Replace and read file comments |
+| `addComment(comment)` / `clearComments()` | Add or clear file comments |
 | `asStringMap()` / `asMap()` | Export visible settings as maps |
 
 ## Values
@@ -253,7 +255,7 @@ description=" Personal notes "
 
 Whitespace around the `=` separator is ignored, so `theme = dark` is read as the key `theme` and value `dark`.
 
-Lines whose first non-whitespace character is `#` or `!` are comment lines and are ignored when loading, along with blank lines. A key that starts with `#` or `!` is escaped automatically when written, and unescaped back to its original form when read.
+`#` and `!` comment lines are read into `comments()`. Comment positions are not preserved; saving writes all comments at the beginning of the file. Comment lines are trimmed, empty comment lines are preserved as empty strings, and line endings inside `comments(...)` and `addComment(...)` entries are split into separate comment lines. A key that starts with `#` or `!` is escaped automatically when written, and unescaped back to its original form when read.
 
 When loading key-value files:
 
@@ -320,7 +322,7 @@ size=14
 
 The `@` key is reserved for the value of the current section when a key has both a value and child keys.
 
-Lines whose first non-whitespace character is `#` or `;` are comment lines and are ignored when loading, along with blank lines. A key that starts with `#` or `;` is escaped automatically when written, and unescaped back to its original form when read.
+`;` and `#` comment lines are read into `comments()`. Comment positions are not preserved; saving writes all comments at the beginning of the file. Comment lines are trimmed, empty comment lines are preserved as empty strings, and line endings inside `comments(...)` and `addComment(...)` entries are split into separate comment lines. A key that starts with `#` or `;` is escaped automatically when written, and unescaped back to its original form when read.
 
 ## Simple YAML Files
 
@@ -350,7 +352,9 @@ editor:
     size: 14
 ```
 
-This format is designed for app settings, not as a complete YAML parser. Flow maps, anchors, tags, and multiline string blocks are not supported. Comments and formatting from an existing file are not preserved when saving.
+Comment lines and inline comments are read into `comments()`. Comment positions are not preserved; saving writes all comments at the beginning of the file. Comment lines are trimmed, empty comment lines are preserved as empty strings, and line endings inside `comments(...)` and `addComment(...)` entries are split into separate comment lines.
+
+This format is designed for app settings, not as a complete YAML parser. Flow maps, anchors, tags, and multiline string blocks are not supported. Existing comment positions and formatting are not preserved when saving.
 
 ## JSON Files
 
@@ -385,7 +389,7 @@ Dotted keys are written as nested JSON objects. If a key has both a value and ch
 }
 ```
 
-Standard JSON has no comment syntax. The built-in parser rejects `//` and `/* */` style comments as invalid JSON when loading, and any comments passed to `store(comments)` are silently ignored when saving to a JSON file.
+Standard JSON has no comment syntax. The built-in parser rejects `//` and `/* */` style comments as invalid JSON when loading. The JSON format ignores the comments argument when written directly, and `AppSettings.comments(...)` throws `AppSettingsException` when JSON is selected.
 
 The built-in JSON parser follows standard JSON syntax for strings, numbers, booleans, null, arrays, and objects. String control characters must be escaped, Unicode escapes must be valid `\uXXXX` sequences, and numbers must not use leading zeros.
 
@@ -403,7 +407,7 @@ SettingsFormat format = new SettingsFormat() {
     }
 
     @Override
-    public void write(Writer writer, Map<String, Object> values, String comments)
+    public void write(Writer writer, Map<String, Object> values, List<String> comments)
             throws IOException {
         writer.write(values.toString());
     }
@@ -426,7 +430,7 @@ Values returned by `read()` follow the same type rules as `set(String, Object)` 
 - `app`, `vendor`, and `fileName` must be names, not paths.
 - Dotted keys are used for nested formats.
 - The `@` key is reserved by INI, simple YAML, and JSON nested output.
-- File-level comments can be written for key-value, INI, and simple YAML files, but existing comments are not preserved. JSON files ignore file-level comments entirely, since standard JSON has no comment syntax.
+- Comments can be written for key-value, INI, and simple YAML files. Existing comment positions are not preserved; saving writes comments at the beginning of the file. JSON files do not read or write comments, since standard JSON has no comment syntax.
 
 ## License
 

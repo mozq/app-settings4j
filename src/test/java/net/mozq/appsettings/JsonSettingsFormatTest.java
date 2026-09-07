@@ -195,6 +195,19 @@ class JsonSettingsFormatTest {
 	}
 
 	@Test
+	void ignoresCommentsOnWrite() throws IOException {
+		StringWriter writer = new StringWriter();
+
+		format.write(writer, Map.of("theme", "dark"), List.of("JSON settings"));
+
+		assertEquals("""
+				{
+				  "theme": "dark"
+				}
+				""", writer.toString());
+	}
+
+	@Test
 	void rejectsNonObjectAndInvalidJson() {
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("[]")));
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": }")));

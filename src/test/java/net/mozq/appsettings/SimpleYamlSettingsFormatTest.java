@@ -144,6 +144,35 @@ class SimpleYamlSettingsFormatTest {
 	}
 
 	@Test
+	void readsComments() throws IOException {
+		String text = String.join("\n",
+				"",
+				"#  First line  ",
+				"#  Second line  ",
+				"",
+				"theme: 'dark' # inline comment",
+				"# later comment");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("First line", "Second line", "inline comment", "later comment"), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
+	void keepsEmptyCommentLines() throws IOException {
+		String text = String.join("\n",
+				"#",
+				"theme: 'dark'",
+				"#  ");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("", ""), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
 	void rejectsOddIndentation() {
 		assertThrows(AppSettingsException.class, () -> format.readValues(new StringReader(" theme: dark")));
 	}

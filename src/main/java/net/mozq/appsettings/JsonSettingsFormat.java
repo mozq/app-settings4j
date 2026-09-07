@@ -19,6 +19,11 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	private static final String NODE_VALUE_KEY = "@";
 
 	@Override
+	public boolean supportsComments() {
+		return false;
+	}
+
+	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
 		StringBuilder content = new StringBuilder(2048);
 		char[] buffer = new char[4096];
@@ -36,7 +41,7 @@ final class JsonSettingsFormat implements InternalSettingsFormat {
 	}
 
 	@Override
-	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
+	public void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException {
 		writeNode(writer, SettingsNode.from(values), 0, nullable);
 		writer.write(System.lineSeparator());
 	}

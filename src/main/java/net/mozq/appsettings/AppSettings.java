@@ -50,6 +50,7 @@ public final class AppSettings {
 	private SettingsFormat format;
 	private TimeZone timeZone = TimeZone.getDefault();
 	private boolean nullable;
+	private List<String> comments = List.of();
 
 	/**
 	 * Creates settings stored under {@code <base>/<vendor>/<app>/<fileName>}.
@@ -98,16 +99,20 @@ public final class AppSettings {
 		lock.writeLock().lock();
 		try {
 			values.clear();
+			comments = List.of();
 			if (!Files.exists(file)) {
 				return this;
 			}
 			try (var reader = Files.newBufferedReader(file, StandardCharsets.UTF_8)) {
 				if (format instanceof InternalSettingsFormat internalFormat) {
-					values.putAll(internalFormat.readValues(reader));
+					SettingsReadResult result = internalFormat.readValuesWithComments(reader);
+					values.putAll(result.values());
+					comments = result.comments();
 				} else {
 					for (Map.Entry<String, Object> entry : format.read(reader).entrySet()) {
 						values.put(entry.getKey(), SettingsValues.of(entry.getValue()));
 					}
+					comments = List.of();
 				}
 			}
 			return this;
@@ -120,27 +125,13 @@ public final class AppSettings {
 	 * Stores settings to {@link #path()}.
 	 */
 	public AppSettings store() throws IOException {
-		return store(null);
-	}
-
-	/**
-	 * Stores settings to {@link #path()} with optional file-level comments.
-	 */
-	public AppSettings store(String comments) throws IOException {
-		return storeTo(path(), comments);
+		return storeTo(path());
 	}
 
 	/**
 	 * Stores settings to the given file.
 	 */
 	public AppSettings storeTo(Path file) throws IOException {
-		return storeTo(file, null);
-	}
-
-	/**
-	 * Stores settings to the given file with optional file-level comments.
-	 */
-	public AppSettings storeTo(Path file, String comments) throws IOException {
 		lock.readLock().lock();
 		try {
 			Path parent = file.getParent();
@@ -152,6 +143,59 @@ public final class AppSettings {
 		} finally {
 			lock.readLock().unlock();
 		}
+	}
+
+	/**
+	 * Sets comments written at the beginning of supported formats.
+	 */
+	public AppSettings comments(List<String> comments) {
+		return setComments(SettingsComments.normalize(comments));
+	}
+
+	/**
+	 * Adds a comment written at the beginning of supported formats.
+	 */
+	public AppSettings addComment(String comment) {
+		lock.writeLock().lock();
+		try {
+			List<String> updatedComments = new ArrayList<>(comments);
+			updatedComments.addAll(SettingsComments.lines(comment));
+			rejectCommentsIfUnsupported(format, updatedComments);
+			this.comments = List.copyOf(updatedComments);
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
+	}
+
+	private AppSettings setComments(List<String> comments) {
+		lock.writeLock().lock();
+		try {
+			rejectCommentsIfUnsupported(format, comments);
+			this.comments = comments;
+			return this;
+		} finally {
+			lock.writeLock().unlock();
+		}
+	}
+
+	/**
+	 * Returns comments read from or written to the settings file.
+	 */
+	public List<String> comments() {
+		lock.readLock().lock();
+		try {
+			return comments;
+		} finally {
+			lock.readLock().unlock();
+		}
+	}
+
+	/**
+	 * Clears comments.
+	 */
+	public AppSettings clearComments() {
+		return setComments(List.of());
 	}
 
 	/**
@@ -576,6 +620,7 @@ public final class AppSettings {
 		Objects.requireNonNull(format, "format");
 		lock.writeLock().lock();
 		try {
+			rejectCommentsIfUnsupported(format, comments);
 			this.format = format;
 			return this;
 		} finally {
@@ -640,7 +685,7 @@ public final class AppSettings {
 		}
 	}
 
-	private void storeAtomicallyOrDirect(Path file, String comments) throws IOException {
+	private void storeAtomicallyOrDirect(Path file, List<String> comments) throws IOException {
 		Path parent = file.getParent();
 		if (parent == null) {
 			writeTo(file, comments);
@@ -689,7 +734,7 @@ public final class AppSettings {
 		return Path.of(userHome, ".config");
 	}
 
-	private void writeTo(Path file, String comments) throws IOException {
+	private void writeTo(Path file, List<String> comments) throws IOException {
 		try (var writer = Files.newBufferedWriter(file, StandardCharsets.UTF_8)) {
 			if (format instanceof InternalSettingsFormat internalFormat) {
 				internalFormat.writeValues(writer, values, comments, nullable);
@@ -765,5 +810,11 @@ public final class AppSettings {
 
 	private <T> T convertValue(Object value, Class<T> type) {
 		return SettingsConverter.convert(value, type, timeZone);
+	}
+
+	private static void rejectCommentsIfUnsupported(SettingsFormat format, List<String> comments) {
+		if (!comments.isEmpty() && !format.supportsComments()) {
+			throw new AppSettingsException("Comments are not supported by this settings format.");
+		}
 	}
 }

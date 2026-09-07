@@ -104,9 +104,38 @@ class IniSettingsFormatTest {
 	@Test
 	void writesFileLevelCommentsWithSemicolonPrefix() throws IOException {
 		StringWriter writer = new StringWriter();
-		format.write(writer, Map.of("theme", "dark"), "INI settings");
+		format.write(writer, Map.of("theme", "dark"), List.of("INI settings"));
 
 		assertTrue(writer.toString().startsWith("; INI settings" + System.lineSeparator()));
+	}
+
+	@Test
+	void readsComments() throws IOException {
+		String text = String.join("\n",
+				"",
+				";  First line  ",
+				"#  Second line  ",
+				"",
+				"theme=dark",
+				"; later comment");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("First line", "Second line", "later comment"), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
+	void keepsEmptyCommentLines() throws IOException {
+		String text = String.join("\n",
+				";",
+				"theme=dark",
+				"#  ");
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(text));
+
+		assertEquals(List.of("", ""), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
 	}
 
 	@Test

@@ -169,10 +169,11 @@ class AppSettingsTest {
 			Path file = tempDir.resolve("config").resolve("settings.properties");
 
 			settings("acme", "notes", "settings.properties")
+					.comments(List.of("Application settings"))
 					.set("theme", "light")
 					.set("window.width", 1024)
 					.set("theme", "dark")
-					.storeTo(file, "Application settings");
+					.storeTo(file);
 
 			AppSettings loaded = settings("acme", "notes", "settings.properties").loadFrom(file);
 
@@ -180,6 +181,208 @@ class AppSettingsTest {
 			assertEquals("dark", loaded.getString("theme", ""));
 			assertEquals(1024, loaded.getInt("window.width", 0));
 			assertEquals("# Application settings", Files.readAllLines(file).getFirst());
+		}
+
+		@Test
+		void storesAndLoadsComments() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("  Notes settings  \n  Stored locally  "))
+					.set("theme", "dark")
+					.storeTo(file);
+
+			AppSettings loaded = settings("acme", "notes", "settings.properties").loadFrom(file);
+
+			assertEquals(List.of("Notes settings", "Stored locally"), settings.comments());
+			assertEquals(List.of("Notes settings", "Stored locally"), loaded.comments());
+			assertEquals("""
+					# Notes settings
+					# Stored locally
+					theme=dark
+					""", Files.readString(file));
+		}
+
+		@Test
+		void storesAndLoadsCommentsForIniAndYaml() throws IOException {
+			Path ini = tempDir.resolve("settings.ini");
+			Path yaml = tempDir.resolve("settings.yaml");
+
+			settings("acme", "notes", "settings.ini")
+					.comments(List.of("Notes settings"))
+					.set("theme", "dark")
+					.storeTo(ini);
+			settings("acme", "notes", "settings.yaml")
+					.comments(List.of("Notes settings"))
+					.set("theme", "dark")
+					.storeTo(yaml);
+
+			assertEquals(List.of("Notes settings"), settings("acme", "notes", "settings.ini").loadFrom(ini).comments());
+			assertEquals(List.of("Notes settings"), settings("acme", "notes", "settings.yaml").loadFrom(yaml).comments());
+			assertTrue(Files.readString(ini).startsWith("; Notes settings\n"));
+			assertTrue(Files.readString(yaml).startsWith("# Notes settings\n"));
+		}
+
+		@Test
+		void registeredCommentsAreStored() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("Notes settings"))
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of("Notes settings"), settings.comments());
+			assertEquals(List.of("Notes settings"), settings("acme", "notes", "settings.properties").loadFrom(file).comments());
+		}
+
+		@Test
+		void loadsAllCommentsFromFile() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+			Files.writeString(file, String.join("\n",
+					"# first comment",
+					"theme=dark",
+					"# later comment"));
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("Old comment"))
+					.loadFrom(file);
+
+			assertEquals(List.of("first comment", "later comment"), settings.comments());
+			assertEquals("dark", settings.getString("theme", ""));
+		}
+
+		@Test
+		void storesEmptyCommentLines() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("  \n  "))
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of("", ""), settings.comments());
+			assertEquals(String.join("\n", "#", "#", "theme=dark", ""), Files.readString(file));
+
+			settings.comments(List.of("Comment")).clearComments().storeTo(file);
+
+			assertEquals(List.of(), settings.comments());
+			assertEquals("theme=dark\n", Files.readString(file));
+		}
+
+		@Test
+		void normalizesCommentsLineEndingsAndTrimsLines() throws IOException {
+			Path lf = tempDir.resolve("lf.properties");
+			Path crlf = tempDir.resolve("crlf.properties");
+			Path cr = tempDir.resolve("cr.properties");
+
+			settings("acme", "notes", "settings.properties")
+					.comments(List.of("\n  First line  \n  Second line  \n"))
+					.set("theme", "dark")
+					.storeTo(lf);
+			settings("acme", "notes", "settings.properties")
+					.comments(List.of("\r\n  First line  \r\n  Second line  \r\n"))
+					.set("theme", "dark")
+					.storeTo(crlf);
+			settings("acme", "notes", "settings.properties")
+					.comments(List.of("\r  First line  \r  Second line  \r"))
+					.set("theme", "dark")
+					.storeTo(cr);
+
+			assertEquals(List.of("", "First line", "Second line", ""), settings("acme", "notes", "settings.properties").loadFrom(lf).comments());
+			assertEquals(List.of("", "First line", "Second line", ""), settings("acme", "notes", "settings.properties").loadFrom(crlf).comments());
+			assertEquals(List.of("", "First line", "Second line", ""), settings("acme", "notes", "settings.properties").loadFrom(cr).comments());
+		}
+
+		@Test
+		void addsCommentAndExpandsLineBreaks() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("First line"))
+					.addComment(" Second line\nThird line ")
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of("First line", "Second line", "Third line"), settings.comments());
+			assertEquals("""
+					# First line
+					# Second line
+					# Third line
+					theme=dark
+					""", Files.readString(file));
+		}
+
+		@Test
+		void clearsCommentsWhenLoadingMissingFile() throws IOException {
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("Comment"))
+					.set("theme", "dark");
+
+			settings.loadFrom(tempDir.resolve("missing.properties"));
+
+			assertEquals(List.of(), settings.comments());
+			assertTrue(settings.isEmpty());
+		}
+
+		@Test
+		void rejectsCommentsForJson() {
+			AppSettings settings = settings("acme", "notes", "settings.json");
+
+			assertThrows(AppSettingsException.class, () -> settings.comments(List.of("Comment")));
+			assertEquals(List.of(), settings.comments());
+		}
+
+		@Test
+		void loadsJsonWithoutComments() throws IOException {
+			Path file = tempDir.resolve("settings.json");
+			Files.writeString(file, """
+					{
+					  "theme": "dark"
+					}
+					""");
+
+			AppSettings settings = settings("acme", "notes", "settings.json").loadFrom(file);
+
+			assertEquals(List.of(), settings.comments());
+			assertEquals("dark", settings.getString("theme", ""));
+		}
+
+		@Test
+		void rejectsSwitchingToJsonWhenCommentsAreSet() {
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("Comment"));
+
+			assertThrows(AppSettingsException.class, () -> settings.format(SettingsFormats.json()));
+		}
+
+		@Test
+		void allowsSwitchingToJsonAfterClearingComments() throws IOException {
+			Path file = tempDir.resolve("settings.json");
+
+			AppSettings settings = settings("acme", "notes", "settings.properties")
+					.comments(List.of("Comment"))
+					.clearComments()
+					.format(SettingsFormats.json())
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of(), settings.comments());
+			assertTrue(Files.readString(file).contains("\"theme\": \"dark\""));
+		}
+
+		@Test
+		void allowsCommentsAfterSwitchingJsonSettingsToSupportedFormat() throws IOException {
+			Path file = tempDir.resolve("settings.properties");
+
+			AppSettings settings = settings("acme", "notes", "settings.json")
+					.format(SettingsFormats.keyValue())
+					.comments(List.of("Notes settings"))
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of("Notes settings"), settings.comments());
+			assertTrue(Files.readString(file).startsWith("# Notes settings\n"));
 		}
 
 		@Test
@@ -629,7 +832,7 @@ class AppSettingsTest {
 				}
 
 				@Override
-				public void write(Writer writer, Map<String, Object> values, String comments) throws IOException {
+				public void write(Writer writer, Map<String, Object> values, List<String> comments) throws IOException {
 					writer.write(String.valueOf(values.get("message")));
 				}
 			};

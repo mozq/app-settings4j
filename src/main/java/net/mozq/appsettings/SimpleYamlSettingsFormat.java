@@ -23,13 +23,28 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
+		return readValuesWithComments(reader).values();
+	}
+
+	@Override
+	public SettingsReadResult readValuesWithComments(Reader reader) throws IOException {
 		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 		LinkedHashMap<String, List<SettingsValue>> lists = new LinkedHashMap<>();
 		BufferedReader bufferedReader = new BufferedReader(reader);
 		List<String> path = new ArrayList<>();
+		List<String> comments = new ArrayList<>();
 		String line;
 		while ((line = bufferedReader.readLine()) != null) {
-			String withoutComment = stripComment(line);
+			String comment = SettingsComments.parseLine(line, '#');
+			if (comment != null) {
+				comments.add(comment);
+				continue;
+			}
+			int commentStart = findCommentStart(line);
+			if (commentStart >= 0) {
+				comments.add(line.substring(commentStart + 1).trim());
+			}
+			String withoutComment = commentStart >= 0 ? line.substring(0, commentStart) : line;
 			if (withoutComment.isBlank()) {
 				continue;
 			}
@@ -69,19 +84,13 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 				values.put(fullKey, parseValue(value));
 			}
 		}
-		return values;
+		return new SettingsReadResult(values, comments);
 	}
 
 	@Override
-	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
+	public void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException {
 		BufferedWriter bufferedWriter = new BufferedWriter(writer);
-		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) {
-				bufferedWriter.write("# ");
-				bufferedWriter.write(line);
-				bufferedWriter.newLine();
-			}
-		}
+		SettingsComments.write(bufferedWriter, comments, "# ");
 		writeNode(bufferedWriter, SettingsNode.from(values), 0, nullable);
 		bufferedWriter.flush();
 	}
@@ -125,7 +134,7 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 		writer.newLine();
 	}
 
-	private static String stripComment(String line) {
+	private static int findCommentStart(String line) {
 		char quote = 0;
 		boolean escaped = false;
 		for (int i = 0; i < line.length(); i++) {
@@ -141,10 +150,10 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 			} else if (quote == c) {
 				quote = 0;
 			} else if (quote == 0 && c == '#') {
-				return line.substring(0, i);
+				return i;
 			}
 		}
-		return line;
+		return -1;
 	}
 
 	private static int countIndent(String line) {
@@ -309,4 +318,5 @@ final class SimpleYamlSettingsFormat implements InternalSettingsFormat {
 			writer.write("  ");
 		}
 	}
+
 }

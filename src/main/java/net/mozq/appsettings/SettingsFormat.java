@@ -9,6 +9,7 @@ package net.mozq.appsettings;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.List;
 import java.util.Map;
 
 /**
@@ -22,8 +23,16 @@ public interface SettingsFormat {
 	Map<String, Object> read(Reader reader) throws IOException;
 
 	/**
-	 * Writes settings. The comments argument may be ignored by formats that do not
-	 * support file-level comments.
+	 * Writes settings. Formats that do not support comments may ignore
+	 * or reject the comments argument.
 	 */
-	void write(Writer writer, Map<String, Object> values, String comments) throws IOException;
+	void write(Writer writer, Map<String, Object> values, List<String> comments) throws IOException;
+
+	/**
+	 * Returns whether this format can carry file-level comments. {@link AppSettings}
+	 * rejects non-empty comments for formats that report {@code false}.
+	 */
+	default boolean supportsComments() {
+		return true;
+	}
 }

@@ -11,7 +11,9 @@ import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
+import java.util.ArrayList;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 final class IniSettingsFormat implements InternalSettingsFormat {
@@ -19,13 +21,24 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
+		return readValuesWithComments(reader).values();
+	}
+
+	@Override
+	public SettingsReadResult readValuesWithComments(Reader reader) throws IOException {
 		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 		BufferedReader bufferedReader = new BufferedReader(reader);
+		List<String> comments = new ArrayList<>();
 		String section = null;
 		String line;
 		while ((line = bufferedReader.readLine()) != null) {
+			String comment = SettingsComments.parseLine(line, ';', '#');
+			if (comment != null) {
+				comments.add(comment);
+				continue;
+			}
 			String trimmed = line.strip();
-			if (trimmed.isEmpty() || trimmed.startsWith("#") || trimmed.startsWith(";")) {
+			if (trimmed.isEmpty()) {
 				continue;
 			}
 			if (trimmed.startsWith("[") && trimmed.endsWith("]")) {
@@ -48,19 +61,13 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 				values.put(section + "." + key, value);
 			}
 		}
-		return values;
+		return new SettingsReadResult(values, comments);
 	}
 
 	@Override
-	public void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException {
+	public void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException {
 		BufferedWriter bufferedWriter = new BufferedWriter(writer);
-		if (comments != null && !comments.isBlank()) {
-			for (String line : comments.split("\\R")) {
-				bufferedWriter.write("; ");
-				bufferedWriter.write(line);
-				bufferedWriter.newLine();
-			}
-		}
+		SettingsComments.write(bufferedWriter, comments, "; ");
 		SettingsNode root = SettingsNode.from(values);
 		writeRootValues(bufferedWriter, root, nullable);
 		writeSections(bufferedWriter, "", root, nullable);
@@ -110,4 +117,5 @@ final class IniSettingsFormat implements InternalSettingsFormat {
 		writer.write(TextSettingsCodec.escapeIniValue(value, nullable));
 		writer.newLine();
 	}
+
 }

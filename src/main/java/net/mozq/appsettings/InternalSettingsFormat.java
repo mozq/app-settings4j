@@ -10,16 +10,21 @@ import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 
 interface InternalSettingsFormat extends SettingsFormat {
 	LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException;
 
-	default void writeValues(Writer writer, Map<String, SettingsValue> values, String comments) throws IOException {
+	default SettingsReadResult readValuesWithComments(Reader reader) throws IOException {
+		return new SettingsReadResult(readValues(reader), List.of());
+	}
+
+	default void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments) throws IOException {
 		writeValues(writer, values, comments, false);
 	}
 
-	void writeValues(Writer writer, Map<String, SettingsValue> values, String comments, boolean nullable) throws IOException;
+	void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException;
 
 	@Override
 	default Map<String, Object> read(Reader reader) throws IOException {
@@ -33,7 +38,7 @@ interface InternalSettingsFormat extends SettingsFormat {
 	}
 
 	@Override
-	default void write(Writer writer, Map<String, Object> values, String comments) throws IOException {
+	default void write(Writer writer, Map<String, Object> values, List<String> comments) throws IOException {
 		LinkedHashMap<String, SettingsValue> settingsValues = new LinkedHashMap<>();
 		for (Map.Entry<String, Object> entry : values.entrySet()) {
 			settingsValues.put(entry.getKey(), SettingsValues.of(entry.getValue()));
