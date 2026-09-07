@@ -15,7 +15,8 @@ public final class SettingsFormats {
 	private static final SettingsFormat KEY_VALUE = new KeyValueSettingsFormat();
 	private static final SettingsFormat INI = new IniSettingsFormat();
 	private static final SettingsFormat SIMPLE_YAML = new SimpleYamlSettingsFormat();
-	private static final SettingsFormat JSON = new JsonSettingsFormat();
+	private static final SettingsFormat JSON = new JsonSettingsFormat(false);
+	private static final SettingsFormat JSONC = new JsonSettingsFormat(true);
 
 	private SettingsFormats() {
 	}
@@ -49,6 +50,13 @@ public final class SettingsFormats {
 	}
 
 	/**
+	 * Returns the built-in JSON-with-comments (JSONC) format.
+	 */
+	public static SettingsFormat jsonc() {
+		return JSONC;
+	}
+
+	/**
 	 * Selects a built-in format from a file name extension.
 	 */
 	public static SettingsFormat byFileName(String fileName) {
@@ -61,6 +69,9 @@ public final class SettingsFormats {
 		}
 		if (lowerFileName.endsWith(".yaml") || lowerFileName.endsWith(".yml")) {
 			return simpleYaml();
+		}
+		if (lowerFileName.endsWith(".jsonc")) {
+			return jsonc();
 		}
 		if (lowerFileName.endsWith(".json")) {
 			return json();

@@ -6,6 +6,7 @@
  */
 package net.mozq.appsettings;
 
+import java.io.BufferedWriter;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.Writer;
@@ -15,35 +16,117 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 
+/**
+ * The built-in JSON format. Also backs the JSONC (JSON-with-comments) format
+ * with {@code commentsSupported} set to {@code true}: both accept and strip
+ * {@code //} and {@code /* *}{@code /} comments when reading, but only JSONC
+ * keeps them in {@link SettingsReadResult#comments()} and writes them back.
+ */
 final class JsonSettingsFormat implements InternalSettingsFormat {
 	private static final String NODE_VALUE_KEY = "@";
 
+	private final boolean commentsSupported;
+
+	JsonSettingsFormat(boolean commentsSupported) {
+		this.commentsSupported = commentsSupported;
+	}
+
 	@Override
 	public boolean supportsComments() {
-		return false;
+		return commentsSupported;
 	}
 
 	@Override
 	public LinkedHashMap<String, SettingsValue> readValues(Reader reader) throws IOException {
+		return readValuesWithComments(reader).values();
+	}
+
+	@Override
+	public SettingsReadResult readValuesWithComments(Reader reader) throws IOException {
 		StringBuilder content = new StringBuilder(2048);
 		char[] buffer = new char[4096];
 		int numRead;
 		while ((numRead = reader.read(buffer)) != -1) {
 			content.append(buffer, 0, numRead);
 		}
-		Object root = new Parser(content).parse();
+		List<String> comments = new ArrayList<>();
+		String stripped = stripComments(content.toString(), comments);
+		Object root = new Parser(stripped).parse();
 		if (!(root instanceof Map<?, ?> map)) {
 			throw new AppSettingsException("JSON settings must be an object");
 		}
 		LinkedHashMap<String, SettingsValue> values = new LinkedHashMap<>();
 		flatten(values, "", map);
-		return values;
+		return new SettingsReadResult(values, commentsSupported ? comments : List.of());
 	}
 
 	@Override
 	public void writeValues(Writer writer, Map<String, SettingsValue> values, List<String> comments, boolean nullable) throws IOException {
-		writeNode(writer, SettingsNode.from(values), 0, nullable);
-		writer.write(System.lineSeparator());
+		BufferedWriter bufferedWriter = new BufferedWriter(writer);
+		if (commentsSupported) {
+			SettingsComments.write(bufferedWriter, comments, "// ");
+		}
+		writeNode(bufferedWriter, SettingsNode.from(values), 0, nullable);
+		bufferedWriter.write(System.lineSeparator());
+		bufferedWriter.flush();
+	}
+
+	/**
+	 * Replaces {@code //} and {@code /* *}{@code /} comments outside of JSON
+	 * strings with whitespace of the same length, collecting their text.
+	 */
+	private static String stripComments(String source, List<String> comments) {
+		int length = source.length();
+		StringBuilder output = new StringBuilder(length);
+		boolean inString = false;
+		boolean escaped = false;
+		int i = 0;
+		while (i < length) {
+			char c = source.charAt(i);
+			if (inString) {
+				output.append(c);
+				if (escaped) {
+					escaped = false;
+				} else if (c == '\\') {
+					escaped = true;
+				} else if (c == '"') {
+					inString = false;
+				}
+				i++;
+				continue;
+			}
+			if (c == '"') {
+				inString = true;
+				output.append(c);
+				i++;
+				continue;
+			}
+			if (c == '/' && i + 1 < length && source.charAt(i + 1) == '/') {
+				int end = source.indexOf("\n", i + 2);
+				if (end < 0) {
+					end = length;
+				}
+				comments.add(source.substring(i + 2, end).trim());
+				output.append(" ".repeat(end - i));
+				i = end;
+				continue;
+			}
+			if (c == '/' && i + 1 < length && source.charAt(i + 1) == '*') {
+				int end = source.indexOf("*/", i + 2);
+				if (end < 0) {
+					throw new AppSettingsException("Unterminated JSON block comment");
+				}
+				comments.add(source.substring(i + 2, end));
+				for (int j = i; j < end + 2; j++) {
+					output.append(source.charAt(j) == '\n' ? '\n' : ' ');
+				}
+				i = end + 2;
+				continue;
+			}
+			output.append(c);
+			i++;
+		}
+		return output.toString();
 	}
 
 	private static void flatten(Map<String, SettingsValue> values, String path, Map<?, ?> map) {

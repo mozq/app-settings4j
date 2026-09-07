@@ -224,6 +224,19 @@ class AppSettingsTest {
 		}
 
 		@Test
+		void storesAndLoadsCommentsForJsonc() throws IOException {
+			Path file = tempDir.resolve("settings.jsonc");
+
+			settings("acme", "notes", "settings.jsonc")
+					.comments(List.of("Notes settings"))
+					.set("theme", "dark")
+					.storeTo(file);
+
+			assertEquals(List.of("Notes settings"), settings("acme", "notes", "settings.jsonc").loadFrom(file).comments());
+			assertTrue(Files.readString(file).startsWith("// Notes settings\n"));
+		}
+
+		@Test
 		void registeredCommentsAreStored() throws IOException {
 			Path file = tempDir.resolve("settings.properties");
 
@@ -468,24 +481,28 @@ class AppSettingsTest {
 			Path yaml = tempDir.resolve("settings.yaml");
 			Path yml = tempDir.resolve("settings.yml");
 			Path json = tempDir.resolve("settings.json");
+			Path jsonc = tempDir.resolve("settings.jsonc");
 
 			storeSampleValues(settings("acme", "notes", "settings.properties"), properties);
 			storeSampleValues(settings("acme", "notes", "settings.ini"), ini);
 			storeSampleValues(settings("acme", "notes", "settings.yaml"), yaml);
 			storeSampleValues(settings("acme", "notes", "settings.yml"), yml);
 			storeSampleValues(settings("acme", "notes", "settings.json"), json);
+			storeSampleValues(settings("acme", "notes", "settings.jsonc"), jsonc);
 
 			assertEquals("window.width=1024", Files.readString(properties).lines().filter(line -> line.startsWith("window.width")).findFirst().orElse(""));
 			assertTrue(Files.readString(ini).contains("[window]"));
 			assertTrue(Files.readString(yaml).contains("window:"));
 			assertTrue(Files.readString(yml).contains("window:"));
 			assertTrue(Files.readString(json).contains("\"window\""));
+			assertTrue(Files.readString(jsonc).contains("\"window\""));
 
 			assertSampleValues(settings("acme", "notes", "settings.properties").loadFrom(properties));
 			assertSampleValues(settings("acme", "notes", "settings.ini").loadFrom(ini));
 			assertSampleValues(settings("acme", "notes", "settings.yaml").loadFrom(yaml));
 			assertSampleValues(settings("acme", "notes", "settings.yml").loadFrom(yml));
 			assertSampleValues(settings("acme", "notes", "settings.json").loadFrom(json));
+			assertSampleValues(settings("acme", "notes", "settings.jsonc").loadFrom(jsonc));
 		}
 
 		private void storeSampleValues(AppSettings settings, Path file) throws IOException {
@@ -521,6 +538,7 @@ class AppSettingsTest {
 			assertSame(SettingsFormats.simpleYaml(), SettingsFormats.byFileName("settings.YAML"));
 			assertSame(SettingsFormats.simpleYaml(), SettingsFormats.byFileName("settings.Yml"));
 			assertSame(SettingsFormats.json(), SettingsFormats.byFileName("settings.JSON"));
+			assertSame(SettingsFormats.jsonc(), SettingsFormats.byFileName("settings.JSONC"));
 		}
 	}
 

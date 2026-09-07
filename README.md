@@ -4,7 +4,7 @@
 
 `app-settings4j` is a small Java library for reading and writing application settings in the standard configuration directory for each OS.
 
-It keeps keys in insertion order, supports common scalar types, can hide or preserve null values, and can store the same settings as key-value, INI, simple YAML, or JSON files.
+It keeps keys in insertion order, supports common scalar types, can hide or preserve null values, and can store the same settings as key-value, INI, simple YAML, JSON, or JSONC files.
 
 ## Installation
 
@@ -72,6 +72,7 @@ The format is selected from the file name by default.
 | `.ini` | INI |
 | `.yaml`, `.yml` | Simple YAML |
 | `.json` | JSON |
+| `.jsonc` | JSONC (JSON with comments) |
 | Other extensions | Key-value |
 
 You can also choose a format explicitly:
@@ -90,6 +91,7 @@ SettingsFormats.keyValue();
 SettingsFormats.ini();
 SettingsFormats.simpleYaml();
 SettingsFormats.json();
+SettingsFormats.jsonc();
 SettingsFormats.byFileName("settings.json");
 ```
 
@@ -389,9 +391,27 @@ Dotted keys are written as nested JSON objects. If a key has both a value and ch
 }
 ```
 
-Standard JSON has no comment syntax. The built-in parser rejects `//` and `/* */` style comments as invalid JSON when loading. The JSON format ignores the comments argument when written directly, and `AppSettings.comments(...)` throws `AppSettingsException` when JSON is selected.
+Standard JSON has no comment syntax, but the built-in parser tolerates `//` and `/* */` style comments when loading and discards them; they are not returned by `comments()`. The JSON format ignores the comments argument when written directly, and `AppSettings.comments(...)` throws `AppSettingsException` when JSON is selected.
 
 The built-in JSON parser follows standard JSON syntax for strings, numbers, booleans, null, arrays, and objects. String control characters must be escaped, Unicode escapes must be valid `\uXXXX` sequences, and numbers must not use leading zeros.
+
+## JSONC Files
+
+JSONC files (`.jsonc`) use the same syntax and value rules as JSON, but also allow `//` line comments and `/* */` block comments outside of strings:
+
+```jsonc
+// Notes settings
+{
+  "theme": "dark",
+  /* window is restored
+     on next launch */
+  "window": {
+    "width": 1024
+  }
+}
+```
+
+Comments are read into `comments()`, the same as key-value, INI, and simple YAML files. Comment positions are not preserved; saving writes all comments as `//` lines at the beginning of the file, followed by the JSON body. A multi-line block comment is split into one entry per line.
 
 ## Custom Formats
 
@@ -430,7 +450,7 @@ Values returned by `read()` follow the same type rules as `set(String, Object)` 
 - `app`, `vendor`, and `fileName` must be names, not paths.
 - Dotted keys are used for nested formats.
 - The `@` key is reserved by INI, simple YAML, and JSON nested output.
-- Comments can be written for key-value, INI, and simple YAML files. Existing comment positions are not preserved; saving writes comments at the beginning of the file. JSON files do not read or write comments, since standard JSON has no comment syntax.
+- Comments can be written for key-value, INI, simple YAML, and JSONC files. Existing comment positions are not preserved; saving writes comments at the beginning of the file. JSON files do not read or write comments, since standard JSON has no comment syntax.
 
 ## License
 

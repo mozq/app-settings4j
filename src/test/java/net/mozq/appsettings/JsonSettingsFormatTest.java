@@ -27,7 +27,7 @@ import org.junit.jupiter.api.Test;
  * documented in the README's "JSON Files" section.
  */
 class JsonSettingsFormatTest {
-	private final JsonSettingsFormat format = new JsonSettingsFormat();
+	private final JsonSettingsFormat format = new JsonSettingsFormat(false);
 
 	@Test
 	void matchesReadmeExampleOnRead() throws IOException {
@@ -208,6 +208,21 @@ class JsonSettingsFormatTest {
 	}
 
 	@Test
+	void toleratesAndDiscardsCommentsOnRead() throws IOException {
+		String json = """
+				// leading comment
+				{
+				  "theme": "dark" /* trailing comment */
+				}
+				""";
+
+		SettingsReadResult result = format.readValuesWithComments(new StringReader(json));
+
+		assertEquals(List.of(), result.comments());
+		assertEquals("dark", SettingsValues.object(result.values().get("theme"), false));
+	}
+
+	@Test
 	void rejectsNonObjectAndInvalidJson() {
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("[]")));
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": }")));
@@ -215,7 +230,10 @@ class JsonSettingsFormatTest {
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": 1.}")));
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": \"\\u12xz\"}")));
 		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": \"line\nbreak\"}")));
-		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": true // comment\n}")));
-		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{\"a\": /* comment */ true}")));
+	}
+
+	@Test
+	void rejectsUnterminatedBlockComment() {
+		assertThrows(AppSettingsException.class, () -> format.read(new StringReader("{/* never closed}")));
 	}
 }
